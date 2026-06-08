@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/authform.tsx","./src/components/displaynamegate.tsx","./src/lib/api.ts","./src/lib/date.ts","./src/lib/ranking.ts","./src/lib/supabase.ts","./src/lib/types.ts","./src/lib/__tests__/ranking.test.ts","./src/pages/dashboardpage.tsx","./src/pages/joingrouppage.tsx"],"version":"5.9.3"}

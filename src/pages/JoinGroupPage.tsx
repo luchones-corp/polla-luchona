@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { getGroupByInviteToken, joinGroupByToken } from '../lib/api'
+import { getGroupByInviteToken, getProfileDisplayName, joinGroupByToken } from '../lib/api'
 import { AuthForm } from '../components/AuthForm'
+import { DisplayNameGate } from '../components/DisplayNameGate'
 
 type JoinGroupPageProps = {
   session: Session | null
@@ -12,18 +13,27 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
   const { token = '' } = useParams()
   const [groupName, setGroupName] = useState<string | null>(null)
   const [groupId, setGroupId] = useState<string | null>(null)
+  const [displayName, setDisplayName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [joined, setJoined] = useState(false)
 
   useEffect(() => {
+    if (!session) {
+      setLoading(false)
+      return
+    }
+
     let mounted = true
 
     async function load() {
       setLoading(true)
       setError(null)
       try {
-        const group = await getGroupByInviteToken(token)
+        const [group, name] = await Promise.all([
+          getGroupByInviteToken(token),
+          getProfileDisplayName(session!.user.id),
+        ])
         if (!mounted) return
         if (!group) {
           setError('Este enlace de invitación ya no es válido.')
@@ -31,6 +41,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
           setGroupName(group.name)
           setGroupId(group.id)
         }
+        setDisplayName(name)
       } catch (caughtError) {
         if (!mounted) return
         const message = caughtError instanceof Error ? caughtError.message : 'No se pudo validar el enlace'
@@ -41,11 +52,8 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
     }
 
     void load()
-
-    return () => {
-      mounted = false
-    }
-  }, [token])
+    return () => { mounted = false }
+  }, [token, session])
 
   async function handleJoin() {
     setError(null)
@@ -58,15 +66,27 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
     }
   }
 
-  if (loading) {
-    return <div className="card">Validando enlace...</div>
-  }
-
   if (!session) {
     return (
       <main className="center-page">
         <AuthForm onDone={() => undefined} />
         <p className="hint">Después de iniciar sesión podrás unirte al grupo.</p>
+      </main>
+    )
+  }
+
+  if (loading) {
+    return <main className="center-page"><div className="card">Validando enlace...</div></main>
+  }
+
+  if (!displayName) {
+    return (
+      <main className="center-page">
+        <DisplayNameGate
+          userId={session.user.id}
+          onSaved={(value) => setDisplayName(value)}
+        />
+        {groupName && <p className="hint">Después podrás unirte a <strong>{groupName}</strong>.</p>}
       </main>
     )
   }
