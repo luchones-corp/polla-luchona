@@ -267,10 +267,11 @@ alter table public.group_members enable row level security;
 alter table public.predictions enable row level security;
 
 drop policy if exists profiles_select_own on public.profiles;
-create policy profiles_select_own
+drop policy if exists profiles_select_authenticated on public.profiles;
+create policy profiles_select_authenticated
 on public.profiles
 for select
-using (id = auth.uid());
+using (auth.role() = 'authenticated');
 
 drop policy if exists profiles_update_own on public.profiles;
 create policy profiles_update_own
