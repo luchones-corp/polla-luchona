@@ -269,7 +269,6 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             <div className="stack-sm top-divider">
               <h3>Invitación</h3>
               <p className="small-text">Comparte este enlace:</p>
-              <code>{`${window.location.origin}/join/${selectedGroup.invite_token}`}</code>
               <button
                 className="ghost"
                 onClick={() => navigator.clipboard.writeText(`${window.location.origin}/join/${selectedGroup.invite_token}`)}
