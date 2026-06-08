@@ -1,26 +1,51 @@
-// @ts-nocheck
-
 import { createClient } from 'npm:@supabase/supabase-js@2.49.8'
 
-type ApiFixture = {
-  fixture: {
-    id: number
-    date: string
-    status: { short: string }
-  }
-  league: {
-    round?: string
-  }
-  teams: {
-    home: { id: number | null; name: string | null; logo: string | null }
-    away: { id: number | null; name: string | null; logo: string | null }
-  }
-  score: {
-    fulltime: { home: number | null; away: number | null }
-  }
+// ---------------------------------------------------------------------------
+// football-data.org v4 — World Cup 2026 sync
+// ---------------------------------------------------------------------------
+
+const API_BASE = 'https://api.football-data.org/v4'
+const COMPETITION = 'WC'
+const DEFAULT_SEASON = '2026'
+const MAX_RETRIES = 3
+
+// ---- API types (verified against live responses) --------------------------
+
+type ApiTeam = {
+  id: number | null
+  name: string
+  shortName: string
+  tla: string
+  crest: string
 }
 
+type ApiScoreNode = { home: number | null; away: number | null }
+
+type ApiScore = {
+  winner: string | null
+  duration: 'REGULAR' | 'EXTRA_TIME' | 'PENALTY_SHOOTOUT'
+  fullTime: ApiScoreNode
+  halfTime: ApiScoreNode
+  regularTime?: ApiScoreNode
+  extraTime?: ApiScoreNode
+  penalties?: ApiScoreNode
+}
+
+type ApiMatch = {
+  id: number
+  utcDate: string
+  status: string
+  stage: string
+  group: string | null
+  homeTeam: ApiTeam
+  awayTeam: ApiTeam
+  score: ApiScore
+}
+
+// ---- DB row types ---------------------------------------------------------
+
 type TeamRow = { id: number; name: string; logo_url: string | null }
+
 type MatchRow = {
   id: number
   stage: 'group' | 'r32' | 'r16' | 'qf' | 'sf' | 'final'
@@ -33,119 +58,170 @@ type MatchRow = {
   status: 'scheduled' | 'live' | 'finished'
 }
 
-function mapStage(round?: string): MatchRow['stage'] {
-  if (!round) return 'group'
-  const normalized = round.toLowerCase()
+// ---- Mappers --------------------------------------------------------------
 
-  if (normalized.includes('group')) return 'group'
-  if (normalized.includes('round of 32') || normalized.includes('1/16')) return 'r32'
-  if (normalized.includes('round of 16') || normalized.includes('1/8')) return 'r16'
-  if (normalized.includes('quarter')) return 'qf'
-  if (normalized.includes('semi')) return 'sf'
-  if (normalized.includes('final')) return 'final'
-
-  return 'group'
-}
-
-function mapStatus(short: string): MatchRow['status'] {
-  if (['FT', 'AET', 'PEN'].includes(short)) return 'finished'
-  if (['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT'].includes(short)) return 'live'
-  return 'scheduled'
-}
-
-function deriveOutcome(
-  status: MatchRow['status'],
-  ftHome: number | null,
-  ftAway: number | null,
-): MatchRow['outcome'] {
-  if (status !== 'finished' || ftHome === null || ftAway === null) {
-    return null
+function mapStage(apiStage: string): MatchRow['stage'] {
+  switch (apiStage) {
+    case 'GROUP_STAGE':     return 'group'
+    case 'LAST_32':         return 'r32'
+    case 'LAST_16':         return 'r16'
+    case 'QUARTER_FINALS':  return 'qf'
+    case 'SEMI_FINALS':     return 'sf'
+    case 'FINAL':
+    case 'THIRD_PLACE':     return 'final'
+    default:                return 'group'
   }
-  if (ftHome > ftAway) return 'HOME'
-  if (ftAway > ftHome) return 'AWAY'
+}
+
+function mapStatus(apiStatus: string): MatchRow['status'] {
+  switch (apiStatus) {
+    case 'FINISHED':          return 'finished'
+    case 'IN_PLAY':
+    case 'PAUSED':
+    case 'EXTRA_TIME':
+    case 'PENALTY_SHOOTOUT':  return 'live'
+    default:                  return 'scheduled'
+  }
+}
+
+/**
+ * Determine the 90-minute score.
+ *
+ * - duration == REGULAR  → fullTime IS the 90-min result (no ET happened)
+ * - duration != REGULAR  → regularTime holds the 90-min score
+ *
+ * For live matches we store the running fullTime score.
+ * For scheduled matches we store nulls.
+ */
+function getScores(
+  score: ApiScore,
+  status: MatchRow['status'],
+): { ft_home: number | null; ft_away: number | null } {
+  if (status === 'scheduled') {
+    return { ft_home: null, ft_away: null }
+  }
+
+  if (status === 'live' || score.duration === 'REGULAR') {
+    return { ft_home: score.fullTime.home, ft_away: score.fullTime.away }
+  }
+
+  // Finished + extra time / penalties → use regularTime (the 90-min score)
+  return {
+    ft_home: score.regularTime?.home ?? null,
+    ft_away: score.regularTime?.away ?? null,
+  }
+}
+
+/**
+ * Outcome based on the 90-minute score, set only for finished matches.
+ */
+function deriveOutcome(
+  score: ApiScore,
+  status: MatchRow['status'],
+): MatchRow['outcome'] {
+  if (status !== 'finished') return null
+
+  const { ft_home, ft_away } = getScores(score, status)
+  if (ft_home === null || ft_away === null) return null
+
+  if (ft_home > ft_away) return 'HOME'
+  if (ft_away > ft_home) return 'AWAY'
   return 'DRAW'
 }
 
-function getApiHeaders(apiKey: string): HeadersInit {
-  const rapidHost = Deno.env.get('APIFOOTBALL_RAPID_HOST')
-  if (rapidHost) {
-    return {
-      'x-rapidapi-key': apiKey,
-      'x-rapidapi-host': rapidHost,
-    }
-  }
+// ---- HTTP with throttle-aware retry ---------------------------------------
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+type ThrottleInfo = { requestsAvailable: number; resetSeconds: number }
+
+function readThrottleHeaders(headers: Headers): ThrottleInfo {
   return {
-    'x-apisports-key': apiKey,
+    requestsAvailable: parseInt(headers.get('x-requests-available-minute') ?? '10', 10),
+    resetSeconds:      parseInt(headers.get('x-requestcounter-reset') ?? '60', 10),
   }
 }
 
-async function fetchFixtures(apiBaseUrl: string, apiKey: string, season: string, league: string): Promise<ApiFixture[]> {
-  const url = `${apiBaseUrl}/fixtures?league=${league}&season=${season}`
-  const response = await fetch(url, {
-    headers: getApiHeaders(apiKey),
-  })
+async function fetchWithRetry(
+  url: string,
+  apiKey: string,
+): Promise<{ body: unknown; throttle: ThrottleInfo }> {
+  let lastError: Error | null = null
 
-  if (!response.ok) {
-    const text = await response.text()
-    throw new Error(`API-Football error ${response.status}: ${text}`)
+  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+    const res = await fetch(url, {
+      headers: { 'X-Auth-Token': apiKey },
+    })
+
+    const throttle = readThrottleHeaders(res.headers)
+    console.log(
+      `[sync] ${url} → ${res.status}  ` +
+      `requests-available: ${throttle.requestsAvailable}, ` +
+      `counter-reset: ${throttle.resetSeconds}s`,
+    )
+
+    if (res.status === 429) {
+      const retryAfter = parseInt(res.headers.get('retry-after') ?? '', 10)
+      const waitSeconds = (isNaN(retryAfter) ? throttle.resetSeconds : retryAfter) * Math.pow(2, attempt)
+      console.log(`[sync] 429 — backing off ${waitSeconds}s (attempt ${attempt + 1}/${MAX_RETRIES})`)
+      lastError = new Error('Rate limited (429)')
+      await sleep(waitSeconds * 1000)
+      continue
+    }
+
+    if (!res.ok) {
+      const text = await res.text()
+      throw new Error(`football-data.org ${res.status}: ${text}`)
+    }
+
+    return { body: await res.json(), throttle }
   }
 
-  const payload = await response.json()
-  return payload.response as ApiFixture[]
+  throw lastError ?? new Error('Max retries exceeded')
 }
 
-function toRows(fixtures: ApiFixture[]) {
-  const teams = new Map<number, TeamRow>()
+// ---- Transform API response → DB rows ------------------------------------
+
+function toRows(apiMatches: ApiMatch[]) {
+  const teamsMap = new Map<number, TeamRow>()
   const matches: MatchRow[] = []
 
-  for (const fixture of fixtures) {
-    const home = fixture.teams.home
-    const away = fixture.teams.away
-
-    if (home.id && home.name) {
-      teams.set(home.id, {
-        id: home.id,
-        name: home.name,
-        logo_url: home.logo,
-      })
+  for (const m of apiMatches) {
+    for (const t of [m.homeTeam, m.awayTeam]) {
+      if (t.id != null) {
+        teamsMap.set(t.id, { id: t.id, name: t.name, logo_url: t.crest ?? null })
+      }
     }
 
-    if (away.id && away.name) {
-      teams.set(away.id, {
-        id: away.id,
-        name: away.name,
-        logo_url: away.logo,
-      })
-    }
-
-    const status = mapStatus(fixture.fixture.status.short)
-    const ftHome = fixture.score.fulltime.home
-    const ftAway = fixture.score.fulltime.away
+    const status = mapStatus(m.status)
+    const { ft_home, ft_away } = getScores(m.score, status)
 
     matches.push({
-      id: fixture.fixture.id,
-      stage: mapStage(fixture.league.round),
-      home_team_id: home.id,
-      away_team_id: away.id,
-      kickoff_at: fixture.fixture.date,
-      ft_home: ftHome,
-      ft_away: ftAway,
-      outcome: deriveOutcome(status, ftHome, ftAway),
+      id:            m.id,
+      stage:         mapStage(m.stage),
+      home_team_id:  m.homeTeam.id ?? null,
+      away_team_id:  m.awayTeam.id ?? null,
+      kickoff_at:    m.utcDate,
+      ft_home,
+      ft_away,
+      outcome:       deriveOutcome(m.score, status),
       status,
     })
   }
 
-  return { teams: [...teams.values()], matches }
+  return { teams: [...teamsMap.values()], matches }
 }
+
+// ---- Edge Function entry --------------------------------------------------
 
 Deno.serve(async () => {
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseUrl   = Deno.env.get('SUPABASE_URL')
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const apiKey = Deno.env.get('APIFOOTBALL_API_KEY')
-    const apiBaseUrl = Deno.env.get('APIFOOTBALL_BASE_URL') ?? 'https://v3.football.api-sports.io'
-    const season = Deno.env.get('APIFOOTBALL_SEASON') ?? '2026'
-    const league = Deno.env.get('APIFOOTBALL_LEAGUE_ID') ?? '1'
+    const apiKey         = Deno.env.get('APIFOOTBALL_API_KEY')
+    const season         = Deno.env.get('APIFOOTBALL_SEASON') ?? DEFAULT_SEASON
 
     if (!supabaseUrl || !serviceRoleKey || !apiKey) {
       return new Response(
@@ -154,52 +230,48 @@ Deno.serve(async () => {
       )
     }
 
-    const fixtures = await fetchFixtures(apiBaseUrl, apiKey, season, league)
-    const { teams, matches } = toRows(fixtures)
+    // One call fetches all 104 WC matches
+    const url = `${API_BASE}/competitions/${COMPETITION}/matches?season=${season}`
+    const { body, throttle } = await fetchWithRetry(url, apiKey)
+    const apiMatches = (body as { matches: ApiMatch[] }).matches
+
+    console.log(`[sync] Fetched ${apiMatches.length} matches (requests remaining: ${throttle.requestsAvailable})`)
+
+    const { teams, matches } = toRows(apiMatches)
 
     const supabase = createClient(supabaseUrl, serviceRoleKey)
 
     if (teams.length > 0) {
-      const { error: teamError } = await supabase
+      const { error: teamErr } = await supabase
         .from('teams')
         .upsert(teams, { onConflict: 'id' })
-
-      if (teamError) {
-        throw teamError
-      }
+      if (teamErr) throw teamErr
     }
 
     if (matches.length > 0) {
-      const { error: matchError } = await supabase
+      const { error: matchErr } = await supabase
         .from('matches')
         .upsert(matches, { onConflict: 'id' })
-
-      if (matchError) {
-        throw matchError
-      }
+      if (matchErr) throw matchErr
     }
+
+    console.log(`[sync] Upserted ${teams.length} teams, ${matches.length} matches`)
 
     return new Response(
       JSON.stringify({
         synced: true,
         teams: teams.length,
         matches: matches.length,
+        requestsAvailable: throttle.requestsAvailable,
       }),
-      {
-        status: 200,
-        headers: { 'content-type': 'application/json' },
-      },
+      { status: 200, headers: { 'content-type': 'application/json' } },
     )
-  } catch (error) {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error'
+    console.error('[sync] Error:', message)
     return new Response(
-      JSON.stringify({
-        synced: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }),
-      {
-        status: 500,
-        headers: { 'content-type': 'application/json' },
-      },
+      JSON.stringify({ synced: false, error: message }),
+      { status: 500, headers: { 'content-type': 'application/json' } },
     )
   }
 })

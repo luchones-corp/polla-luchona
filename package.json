@@ -20,6 +20,7 @@
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.5",
     "@vitejs/plugin-react": "^5.0.0",
+    "supabase": "^2.105.0",
     "typescript": "^5.8.2",
     "vite": "^7.0.0",
     "vitest": "^4.1.8"

@@ -6,7 +6,7 @@ Aplicación para grupos privados donde amigos predicen resultados de partidos de
 
 - `React` + `Vite`
 - `Supabase` (Postgres + Auth + Edge Functions)
-- `API-Football` para fixtures/resultados (solo server-side)
+- `football-data.org v4` para fixtures/resultados (solo server-side)
 
 ## Lo implementado
 
@@ -21,7 +21,7 @@ Aplicación para grupos privados donde amigos predicen resultados de partidos de
 - Leaderboard por grupo con empates compartiendo rank
 - Gestión owner: regenerar invite link y remover miembro
 - Highlight top 3 cuando terminan todos los partidos
-- Edge Function para sync de API-Football usando `score.fulltime` (regla 90 min)
+- Edge Function para sync de football-data.org v4 con outcome basado en 90 min (`score.fullTime` o `score.regularTime` según `score.duration`)
 
 ## Estructura importante
 
@@ -42,13 +42,8 @@ Cliente (`Vite`):
 Servidor / sync:
 
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `APIFOOTBALL_API_KEY`
-- `APIFOOTBALL_BASE_URL` (default: `https://v3.football.api-sports.io`)
+- `APIFOOTBALL_API_KEY` — clave de football-data.org (header `X-Auth-Token`)
 - `APIFOOTBALL_SEASON` (default: `2026`)
-- `APIFOOTBALL_LEAGUE_ID` (default: `1`)
-- `APIFOOTBALL_RAPID_HOST` (opcional si usas RapidAPI)
-
-Ver `.env.example`.
 
 ## Setup local
 
@@ -85,4 +80,4 @@ supabase functions invoke sync-fixtures
 
 ## Nota clave de scoring
 
-En knockouts, el `outcome` se calcula con `fixture.score.fulltime` (90 min), no con marcador final tras extra-time/penales.
+En knockouts, el `outcome` se calcula con el score a 90 min: si `score.duration == "REGULAR"` se usa `score.fullTime`; si no, se usa `score.regularTime`. Nunca se usa `score.winner` (incluye extra-time/penales).
