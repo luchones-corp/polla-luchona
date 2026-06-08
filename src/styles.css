@@ -1,8 +1,9 @@
 :root {
   color-scheme: dark;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #0f1220;
-  color: #e8ebff;
+  font-size: 14px;
+  background: #0a1410;
+  color: #dce8e0;
 }
 
 * {
@@ -11,12 +12,16 @@
 
 body {
   margin: 0;
-  background: radial-gradient(circle at top, #1d2440, #0f1220 45%);
+  background: radial-gradient(circle at top, #142a1e, #0a1410 50%);
 }
 
 h1, h2, h3, p {
   margin: 0;
 }
+
+h1 { font-size: 1.25rem; }
+h2 { font-size: 1.05rem; }
+h3 { font-size: 0.95rem; }
 
 button,
 input {
@@ -24,46 +29,49 @@ input {
 }
 
 button {
-  border: 1px solid #5b69ff;
-  background: #5b69ff;
+  border: 1px solid #2e7d4f;
+  background: #2e7d4f;
   color: white;
-  border-radius: 10px;
-  padding: 0.55rem 0.8rem;
+  border-radius: 8px;
+  padding: 0.4rem 0.7rem;
   cursor: pointer;
+  font-size: 0.85rem;
 }
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 button.ghost {
   background: transparent;
-  border-color: #6f7cb4;
+  border-color: #4a7a5e;
+  color: #a8cfb8;
 }
 
 button.danger {
-  border-color: #c44444;
-  background: #c44444;
+  border-color: #b33;
+  background: #b33;
 }
 
 button.active {
-  border-color: #23c483;
-  background: #23c483;
+  border-color: #4caf50;
+  background: #4caf50;
 }
 
 input {
   width: 100%;
-  padding: 0.5rem 0.65rem;
-  border-radius: 10px;
-  border: 1px solid #445080;
-  background: #151a30;
-  color: #eef1ff;
+  padding: 0.4rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid #2a4a36;
+  background: #0d1a14;
+  color: #dce8e0;
+  font-size: 0.85rem;
 }
 
 label {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.3rem;
 }
 
 code {
@@ -71,10 +79,11 @@ code {
   width: 100%;
   white-space: nowrap;
   overflow: auto;
-  padding: 0.5rem;
-  border-radius: 8px;
-  border: 1px solid #3f4f89;
-  background: #0f1326;
+  padding: 0.4rem;
+  border-radius: 6px;
+  border: 1px solid #2a4a36;
+  background: #0b1610;
+  font-size: 0.8rem;
 }
 
 .center-page {
@@ -85,24 +94,24 @@ code {
 }
 
 .app-shell {
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 0.75rem;
   display: grid;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .topbar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .layout-grid {
   display: grid;
-  gap: 1rem;
-  grid-template-columns: minmax(280px, 320px) 1fr;
+  gap: 0.75rem;
+  grid-template-columns: minmax(240px, 280px) 1fr;
 }
 
 .layout-grid > :nth-child(3) {
@@ -110,31 +119,37 @@ code {
 }
 
 .card {
-  background: #13182d;
-  border: 1px solid #2b3764;
-  border-radius: 14px;
-  padding: 1rem;
+  background: #111f18;
+  border: 1px solid #1e3a2a;
+  border-radius: 10px;
+  padding: 0.75rem;
   display: grid;
-  gap: 0.8rem;
+  gap: 0.6rem;
 }
 
 .auth-card {
-  width: min(480px, 95vw);
+  width: min(420px, 95vw);
+}
+
+.group-name {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #7ee8a8;
 }
 
 .stack-sm {
   display: grid;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
 .stack-md {
   display: grid;
-  gap: 0.8rem;
+  gap: 0.6rem;
 }
 
 .top-divider {
-  padding-top: 0.8rem;
-  border-top: 1px solid #263156;
+  padding-top: 0.6rem;
+  border-top: 1px solid #1e3a2a;
 }
 
 .table-wrap {
@@ -149,27 +164,33 @@ table {
 th,
 td {
   text-align: left;
-  padding: 0.6rem;
-  border-bottom: 1px solid #23305a;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid #1e3a2a;
   vertical-align: middle;
+  font-size: 0.85rem;
+}
+
+th {
+  color: #7aaa8e;
+  font-weight: 600;
 }
 
 .pick-row {
   display: flex;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
 .member-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
 .hint,
 .small-text {
-  color: #b8c0e9;
-  font-size: 0.92rem;
+  color: #8aab98;
+  font-size: 0.82rem;
 }
 
 .error {
@@ -177,18 +198,19 @@ td {
 }
 
 .success {
-  color: #97efc9;
+  color: #7ee8a8;
 }
 
 .top-three {
-  background: #26354f;
+  background: #1a3328;
 }
 
 .pagination-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
+  gap: 0.75rem;
+  font-size: 0.85rem;
 }
 
 @media (max-width: 1020px) {

@@ -219,30 +219,39 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
 
       <section className="layout-grid">
         <aside className="card">
-          <h2>Grupos</h2>
-
-          <form onSubmit={handleCreateGroup} className="stack-sm">
-            <input
-              value={newGroupName}
-              onChange={(event) => setNewGroupName(event.target.value)}
-              placeholder="Nombre del grupo"
-              required
-            />
-            <button type="submit">Crear grupo</button>
-          </form>
-
-          <div className="stack-sm">
-            {groups.map((group) => (
-              <button
-                key={group.id}
-                className={group.id === selectedGroupId ? 'active' : ''}
-                onClick={() => setSelectedGroupId(group.id)}
-              >
-                {group.name}
-              </button>
-            ))}
-            {!groups.length && !loading && <p>Aún no perteneces a grupos.</p>}
-          </div>
+          {groups.length === 0 && !loading ? (
+            <>
+              <h2>Crear grupo</h2>
+              <form onSubmit={handleCreateGroup} className="stack-sm">
+                <input
+                  value={newGroupName}
+                  onChange={(event) => setNewGroupName(event.target.value)}
+                  placeholder="Nombre del grupo"
+                  required
+                />
+                <button type="submit">Crear grupo</button>
+              </form>
+              <p className="hint">Aún no perteneces a grupos.</p>
+            </>
+          ) : (
+            <>
+              {selectedGroup && <p className="group-name">{selectedGroup.name}</p>}
+              {groups.length > 1 && (
+                <div className="stack-sm">
+                  <p className="small-text">Cambiar grupo:</p>
+                  {groups.filter((g) => g.id !== selectedGroupId).map((group) => (
+                    <button
+                      key={group.id}
+                      className="ghost"
+                      onClick={() => setSelectedGroupId(group.id)}
+                    >
+                      {group.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
           {selectedGroup && (
             <div className="stack-sm top-divider">
