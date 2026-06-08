@@ -175,6 +175,31 @@ th {
   font-weight: 600;
 }
 
+.match-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.team-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.team-crest {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  vertical-align: middle;
+}
+
+.vs {
+  color: #4a7a5e;
+  font-size: 0.8rem;
+}
+
 .pick-row {
   display: flex;
   gap: 0.35rem;

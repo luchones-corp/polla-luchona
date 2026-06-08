@@ -36,10 +36,10 @@ export function DisplayNameGate({ userId, onSaved }: DisplayNameGateProps) {
   return (
     <div className="card auth-card">
       <h2>Elige tu nombre para mostrar</h2>
-      <p>Este nombre aparecerá en los leaderboards de tus grupos.</p>
+      <p>Este nombre aparecerá en las tablas de posiciones de tus grupos.</p>
       <form onSubmit={handleSubmit} className="stack-md">
         <label>
-          Display name
+          Nombre
           <input
             required
             value={displayName}

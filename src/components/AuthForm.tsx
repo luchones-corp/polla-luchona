@@ -39,23 +39,23 @@ export function AuthForm({ onDone }: AuthFormProps) {
 
   return (
     <div className="card auth-card">
-      <h1>World Cup 2026 Pool</h1>
+      <h1>Mundial 2026 - Polla</h1>
       <p>Inicia sesión o crea tu cuenta para empezar.</p>
 
       <form onSubmit={handleSubmit} className="stack-md">
         <label>
-          Email
+          Correo
           <input
             type="email"
             required
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder="you@example.com"
+            placeholder="tu@correo.com"
           />
         </label>
 
         <label>
-          Password
+          Contraseña
           <input
             type="password"
             required

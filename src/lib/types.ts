@@ -22,6 +22,8 @@ export type Fixture = {
   away_team_id: number | null
   home_team_name: string
   away_team_name: string
+  home_team_logo: string | null
+  away_team_logo: string | null
 }
 
 export type Prediction = {

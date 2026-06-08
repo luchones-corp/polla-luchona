@@ -94,7 +94,7 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
 export async function getFixtures(): Promise<Fixture[]> {
   const { data, error } = await supabase
     .from('matches')
-    .select('id, stage, kickoff_at, status, outcome, home_team_id, away_team_id, home_team:teams!matches_home_team_id_fkey(name), away_team:teams!matches_away_team_id_fkey(name)')
+    .select('id, stage, kickoff_at, status, outcome, home_team_id, away_team_id, home_team:teams!matches_home_team_id_fkey(name, logo_url), away_team:teams!matches_away_team_id_fkey(name, logo_url)')
     .order('kickoff_at', { ascending: true })
 
   if (error) throw error
@@ -107,8 +107,10 @@ export async function getFixtures(): Promise<Fixture[]> {
     outcome: row.outcome,
     home_team_id: row.home_team_id,
     away_team_id: row.away_team_id,
-    home_team_name: row.home_team?.name ?? 'TBD',
-    away_team_name: row.away_team?.name ?? 'TBD',
+    home_team_name: row.home_team?.name ?? 'Por definir',
+    away_team_name: row.away_team?.name ?? 'Por definir',
+    home_team_logo: row.home_team?.logo_url ?? null,
+    away_team_logo: row.away_team?.logo_url ?? null,
   }))
 }
 

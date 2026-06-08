@@ -23,6 +23,18 @@ type DashboardPageProps = {
 
 const picks: MatchPick[] = ['HOME', 'DRAW', 'AWAY']
 
+const pickLabel: Record<MatchPick, string> = {
+  HOME: 'Local',
+  DRAW: 'Empate',
+  AWAY: 'Visita',
+}
+
+const statusLabel: Record<string, string> = {
+  scheduled: 'Programado',
+  live: 'En vivo',
+  finished: 'Finalizado',
+}
+
 export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const [groups, setGroups] = useState<Group[]>([])
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
@@ -209,7 +221,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     <main className="app-shell">
       <header className="topbar">
         <div>
-          <h1>World Cup 2026 Pool</h1>
+          <h1>Mundial 2026 - Polla</h1>
           <p>Hola, {displayName}</p>
         </div>
         <button className="ghost" onClick={() => void signOut()}>Cerrar sesión</button>
@@ -290,15 +302,15 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
         </aside>
 
         <section className="card">
-          <h2>Fixtures y predicciones</h2>
+          <h2>Partidos y predicciones</h2>
           <div className="table-wrap">
             <table>
               <thead>
                 <tr>
                   <th>Partido</th>
-                  <th>Kickoff (local)</th>
+                  <th>Hora (local)</th>
                   <th>Estado</th>
-                  <th>Tu pick</th>
+                  <th>Predicción</th>
                 </tr>
               </thead>
               <tbody>
@@ -308,9 +320,19 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
 
                   return (
                     <tr key={fixture.id}>
-                      <td>{fixture.home_team_name} vs {fixture.away_team_name}</td>
+                      <td className="match-cell">
+                        <span className="team-side">
+                          {fixture.home_team_logo && <img className="team-crest" src={fixture.home_team_logo} alt="" />}
+                          {fixture.home_team_name}
+                        </span>
+                        <span className="vs">vs</span>
+                        <span className="team-side">
+                          {fixture.away_team_logo && <img className="team-crest" src={fixture.away_team_logo} alt="" />}
+                          {fixture.away_team_name}
+                        </span>
+                      </td>
                       <td>{formatLocalKickoff(fixture.kickoff_at)}</td>
-                      <td>{fixture.status}</td>
+                      <td>{statusLabel[fixture.status] ?? fixture.status}</td>
                       <td>
                         <div className="pick-row">
                           {picks.map((pick) => (
@@ -320,7 +342,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
                               disabled={!unlocked}
                               onClick={() => void handlePick(fixture.id, pick)}
                             >
-                              {pick}
+                              {pickLabel[pick]}
                             </button>
                           ))}
                         </div>
@@ -344,7 +366,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
         </section>
 
         <section className="card">
-          <h2>Leaderboard</h2>
+          <h2>Tabla de posiciones</h2>
           {!selectedGroupId ? (
             <p>Selecciona un grupo para ver posiciones.</p>
           ) : (
@@ -352,7 +374,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
               <table>
                 <thead>
                   <tr>
-                    <th>Rank</th>
+                    <th>Pos.</th>
                     <th>Jugador</th>
                     <th>Puntos</th>
                   </tr>

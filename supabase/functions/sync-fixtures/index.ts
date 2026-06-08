@@ -182,6 +182,62 @@ async function fetchWithRetry(
   throw lastError ?? new Error('Max retries exceeded')
 }
 
+// ---- Spanish team names ---------------------------------------------------
+
+const teamNameEs: Record<string, string> = {
+  'Algeria': 'Argelia',
+  'Australia': 'Australia',
+  'Austria': 'Austria',
+  'Belgium': 'Bélgica',
+  'Bosnia-Herzegovina': 'Bosnia-Herzegovina',
+  'Brazil': 'Brasil',
+  'Canada': 'Canadá',
+  'Cape Verde Islands': 'Cabo Verde',
+  'Colombia': 'Colombia',
+  'Congo DR': 'RD Congo',
+  'Croatia': 'Croacia',
+  'Curaçao': 'Curazao',
+  'Czechia': 'Chequia',
+  'Ecuador': 'Ecuador',
+  'Egypt': 'Egipto',
+  'England': 'Inglaterra',
+  'France': 'Francia',
+  'Germany': 'Alemania',
+  'Ghana': 'Ghana',
+  'Haiti': 'Haití',
+  'Iran': 'Irán',
+  'Iraq': 'Irak',
+  'Ivory Coast': 'Costa de Marfil',
+  'Japan': 'Japón',
+  'Jordan': 'Jordania',
+  'Mexico': 'México',
+  'Morocco': 'Marruecos',
+  'Netherlands': 'Países Bajos',
+  'New Zealand': 'Nueva Zelanda',
+  'Norway': 'Noruega',
+  'Panama': 'Panamá',
+  'Paraguay': 'Paraguay',
+  'Portugal': 'Portugal',
+  'Qatar': 'Catar',
+  'Saudi Arabia': 'Arabia Saudita',
+  'Scotland': 'Escocia',
+  'Senegal': 'Senegal',
+  'South Africa': 'Sudáfrica',
+  'South Korea': 'Corea del Sur',
+  'Spain': 'España',
+  'Sweden': 'Suecia',
+  'Switzerland': 'Suiza',
+  'Tunisia': 'Túnez',
+  'Turkey': 'Turquía',
+  'United States': 'Estados Unidos',
+  'Uruguay': 'Uruguay',
+  'Uzbekistan': 'Uzbekistán',
+}
+
+function spanishName(name: string): string {
+  return teamNameEs[name] ?? name
+}
+
 // ---- Transform API response → DB rows ------------------------------------
 
 function toRows(apiMatches: ApiMatch[]) {
@@ -191,7 +247,7 @@ function toRows(apiMatches: ApiMatch[]) {
   for (const m of apiMatches) {
     for (const t of [m.homeTeam, m.awayTeam]) {
       if (t.id != null) {
-        teamsMap.set(t.id, { id: t.id, name: t.name, logo_url: t.crest ?? null })
+        teamsMap.set(t.id, { id: t.id, name: spanishName(t.name), logo_url: t.crest ?? null })
       }
     }
 
