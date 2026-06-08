@@ -184,6 +184,13 @@ td {
   background: #26354f;
 }
 
+.pagination-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+}
+
 @media (max-width: 1020px) {
   .layout-grid {
     grid-template-columns: 1fr;

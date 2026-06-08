@@ -33,6 +33,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const [newGroupName, setNewGroupName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fixturesPage, setFixturesPage] = useState(0)
 
   const selectedGroup = useMemo(
     () => groups.find((group) => group.id === selectedGroupId) ?? null,
@@ -44,6 +45,13 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const allMatchesFinished = useMemo(
     () => fixtures.length > 0 && fixtures.every((fixture) => fixture.status === 'finished'),
     [fixtures],
+  )
+
+  const FIXTURES_PER_PAGE = 10
+  const totalFixturesPages = Math.max(1, Math.ceil(fixtures.length / FIXTURES_PER_PAGE))
+  const pagedFixtures = fixtures.slice(
+    fixturesPage * FIXTURES_PER_PAGE,
+    (fixturesPage + 1) * FIXTURES_PER_PAGE,
   )
 
   async function reloadBaseData() {
@@ -285,7 +293,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
                 </tr>
               </thead>
               <tbody>
-                {fixtures.map((fixture) => {
+                {pagedFixtures.map((fixture) => {
                   const currentPick = predictionsByMatch[fixture.id]?.pick
                   const unlocked = isBeforeKickoff(fixture.kickoff_at)
 
@@ -313,6 +321,16 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="pagination-row">
+            <button disabled={fixturesPage === 0} onClick={() => setFixturesPage((p) => p - 1)}>
+              ← Anterior
+            </button>
+            <span>{fixturesPage + 1} / {totalFixturesPages}</span>
+            <button disabled={fixturesPage >= totalFixturesPages - 1} onClick={() => setFixturesPage((p) => p + 1)}>
+              Siguiente →
+            </button>
           </div>
         </section>
 
