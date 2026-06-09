@@ -16,14 +16,21 @@ export function App() {
 
   if (missingSupabaseEnvVars.length > 0) {
     return (
-      <main className="center-page">
-        <div className="card auth-card">
-          <h2>Configuración pendiente</h2>
-          <p>Faltan variables de entorno para conectar con Supabase:</p>
-          <code>{missingSupabaseEnvVars.join(', ')}</code>
-          <p className="hint">Crea `.env` desde `.env.example` y reinicia `npm run dev`.</p>
+      <>
+        <div className="stage-bg" />
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div className="card" style={{ padding: 24, maxWidth: 420 }}>
+            <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 24, textTransform: 'uppercase', marginBottom: 12 }}>
+              Configuración pendiente
+            </h2>
+            <p style={{ color: 'var(--ink-2)', marginBottom: 12 }}>Faltan variables de entorno para conectar con Supabase:</p>
+            <code style={{ display: 'block', padding: 12, borderRadius: 8, background: 'var(--bg-2)', border: '1px solid var(--line)', marginBottom: 12 }}>
+              {missingSupabaseEnvVars.join(', ')}
+            </code>
+            <p style={{ color: 'var(--ink-3)', fontSize: 13 }}>Crea .env desde .env.example y reinicia npm run dev.</p>
+          </div>
         </div>
-      </main>
+      </>
     )
   }
 
@@ -86,31 +93,38 @@ export function App() {
   }, [session?.user.id])
 
   if (loading) {
-    return <main className="center-page"><div className="card">Cargando aplicación...</div></main>
+    return (
+      <>
+        <div className="stage-bg" />
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+          <p style={{ fontFamily: 'var(--font-head)', fontWeight: 700, color: 'var(--ink-2)' }}>Cargando...</p>
+        </div>
+      </>
+    )
   }
 
   return (
-    <Routes>
-      <Route path="/join/:token" element={<JoinGroupPage session={session} />} />
-      <Route
-        path="/"
-        element={
-          !session ? (
-            <main className="center-page">
+    <>
+      <div className="stage-bg" />
+      <Routes>
+        <Route path="/join/:token" element={<JoinGroupPage session={session} />} />
+        <Route
+          path="/"
+          element={
+            !session ? (
               <AuthForm onDone={() => undefined} />
-              {error && <p className="error">{error}</p>}
-            </main>
-          ) : !displayName ? (
-            <main className="center-page">
-              <DisplayNameGate userId={session.user.id} onSaved={(value) => setDisplayName(value)} />
-              {error && <p className="error">{error}</p>}
-            </main>
-          ) : (
-            <DashboardPage session={session} displayName={displayName} />
-          )
-        }
-      />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+            ) : !displayName ? (
+              <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+                <DisplayNameGate userId={session.user.id} onSaved={(value) => setDisplayName(value)} />
+                {error && <p className="error-msg">{error}</p>}
+              </div>
+            ) : (
+              <DashboardPage session={session} displayName={displayName} />
+            )
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   )
 }

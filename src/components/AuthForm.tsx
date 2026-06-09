@@ -5,6 +5,8 @@ type AuthFormProps = {
   onDone: () => void
 }
 
+const FLAG_CODES = ['mx','br','ar','fr','de','es','us','jp','ma','nl','pt','kr','ca','au','gb-sct','cw']
+
 export function AuthForm({ onDone }: AuthFormProps) {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
@@ -38,52 +40,84 @@ export function AuthForm({ onDone }: AuthFormProps) {
   }
 
   return (
-    <div className="card auth-card">
-      <h1>Mundial 2026 - Polla</h1>
-      <p>Inicia sesión o crea tu cuenta para empezar.</p>
+    <div className="auth-stage">
+      <div className="auth-art">
+        <div className="brand">
+          <div className="brand-mark"><span>LP</span></div>
+          <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+        </div>
+        <div>
+          <div className="big-word">PREDICE.<br />COMPITE.<br /><span className="hl">GANA.</span></div>
+          <p className="tagline">Arma tu polla del Mundial, invita a tus amigos y demuestra quién sabe más de fútbol.</p>
+        </div>
+        <div>
+          <div className="flag-strip" style={{ marginBottom: 26 }}>
+            {FLAG_CODES.map((c) => (
+              <img key={c} className="flag flag-ring" src={`https://flagcdn.com/w80/${c}.png`} alt="" width={38} height={26} style={{ borderRadius: 5 }} />
+            ))}
+          </div>
+          <div className="art-foot">
+            <div className="art-stat"><b>48</b><em>Selecciones</em></div>
+            <div className="art-stat"><b>104</b><em>Partidos</em></div>
+          </div>
+        </div>
+      </div>
 
-      <form onSubmit={handleSubmit} className="stack-md">
-        <label>
-          Correo
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="tu@correo.com"
-          />
-        </label>
+      <div className="auth-panel">
+        <div className="auth-box fade-in">
+          <div className="brand" style={{ marginBottom: 26 }}>
+            <div className="brand-mark"><span>LP</span></div>
+            <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+          </div>
 
-        <label>
-          Contraseña
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            placeholder="••••••••"
-          />
-        </label>
+          <div className="seg-tabs">
+            <button className={mode === 'signin' ? 'on' : ''} onClick={() => { setMode('signin'); setError(null); setMessage(null) }}>
+              Iniciar sesión
+            </button>
+            <button className={mode === 'signup' ? 'on' : ''} onClick={() => { setMode('signup'); setError(null); setMessage(null) }}>
+              Crear cuenta
+            </button>
+          </div>
 
-        <button type="submit" disabled={loading}>
-          {loading ? 'Cargando...' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
-        </button>
-      </form>
+          <h1>{mode === 'signin' ? 'Bienvenido de vuelta' : 'Únete al juego'}</h1>
+          <p className="lead">
+            {mode === 'signin'
+              ? 'Entra para hacer tus predicciones de la jornada.'
+              : 'Crea tu cuenta y empieza a predecir en segundos.'}
+          </p>
 
-      <button
-        className="ghost"
-        onClick={() => {
-          setMode(mode === 'signin' ? 'signup' : 'signin')
-          setError(null)
-          setMessage(null)
-        }}
-      >
-        {mode === 'signin' ? '¿No tienes cuenta? Crear cuenta' : '¿Ya tienes cuenta? Iniciar sesión'}
-      </button>
+          <form onSubmit={handleSubmit}>
+            <div className="field">
+              <label>Correo</label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu@correo.com"
+              />
+            </div>
+            <div className="field">
+              <label>Contraseña</label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
 
-      {message && <p className="success">{message}</p>}
-      {error && <p className="error">{error}</p>}
+            <button className="btn btn-primary btn-block" type="submit" disabled={loading} style={{ marginTop: 8 }}>
+              {loading ? 'Cargando...' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
+            </button>
+          </form>
+
+          {message && <p className="success-msg" style={{ marginTop: 14, textAlign: 'center' }}>{message}</p>}
+          {error && <p className="error-msg" style={{ marginTop: 14, textAlign: 'center' }}>{error}</p>}
+        </div>
+      </div>
     </div>
   )
 }

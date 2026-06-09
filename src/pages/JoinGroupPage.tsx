@@ -67,47 +67,106 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
   }
 
   if (!session) {
-    return (
-      <main className="center-page">
-        <AuthForm onDone={() => undefined} />
-        <p className="hint">Después de iniciar sesión podrás unirte al grupo.</p>
-      </main>
-    )
+    return <AuthForm onDone={() => undefined} />
   }
 
   if (loading) {
-    return <main className="center-page"><div className="card">Validando enlace...</div></main>
+    return (
+      <>
+        <div className="stage-bg" />
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
+          <p style={{ fontFamily: 'var(--font-head)', fontWeight: 700, color: 'var(--ink-2)' }}>Validando enlace...</p>
+        </div>
+      </>
+    )
   }
 
   if (!displayName) {
     return (
-      <main className="center-page">
-        <DisplayNameGate
-          userId={session.user.id}
-          onSaved={(value) => setDisplayName(value)}
-        />
-        {groupName && <p className="hint">Después podrás unirte a <strong>{groupName}</strong>.</p>}
-      </main>
+      <>
+        <div className="stage-bg" />
+        <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <div>
+            <DisplayNameGate
+              userId={session.user.id}
+              onSaved={(value) => setDisplayName(value)}
+            />
+            {groupName && (
+              <p style={{ textAlign: 'center', color: 'var(--ink-2)', fontSize: 14, marginTop: 14 }}>
+                Después podrás unirte a <strong style={{ color: 'var(--ink-1)' }}>{groupName}</strong>.
+              </p>
+            )}
+          </div>
+        </div>
+      </>
     )
   }
 
   return (
-    <main className="center-page">
-      <div className="card auth-card">
-        <h2>Invitación a grupo</h2>
-        {groupName && <p>Te invitaron a <strong>{groupName}</strong>.</p>}
+    <>
+      <div className="stage-bg" />
+      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <div className="card fade-in" style={{ padding: 28, width: 'min(420px, 95vw)', textAlign: 'center' }}>
+          <div className="brand" style={{ marginBottom: 20, justifyContent: 'center' }}>
+            <div className="brand-mark"><span>LP</span></div>
+            <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+          </div>
 
-        {!joined ? (
-          <button onClick={() => void handleJoin()} disabled={!groupId}>Unirme al grupo</button>
-        ) : (
-          <>
-            <p className="success">¡Listo! Ya eres miembro del grupo.</p>
-            <Link to="/">Ir al dashboard</Link>
-          </>
-        )}
+          {groupName && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center',
+              marginBottom: 20, padding: '14px 18px', borderRadius: 12,
+              background: 'var(--bg-2)', border: '1px solid var(--line)',
+            }}>
+              <div style={{
+                width: 42, height: 42, borderRadius: 10, background: 'var(--lime)',
+                color: '#0a0d10', display: 'grid', placeItems: 'center',
+                fontFamily: 'var(--font-disp)', fontSize: 17, transform: 'skewX(-6deg)', flexShrink: 0,
+              }}>
+                <span style={{ transform: 'skewX(6deg)' }}>🏆</span>
+              </div>
+              <div style={{ textAlign: 'left' }}>
+                <h3 style={{ fontFamily: 'var(--font-disp)', fontSize: 18, textTransform: 'uppercase' }}>{groupName}</h3>
+                <div style={{ color: 'var(--ink-3)', fontSize: 12, fontWeight: 600 }}>Mundial 2026</div>
+              </div>
+            </div>
+          )}
 
-        {error && <p className="error">{error}</p>}
+          <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 24, textTransform: 'uppercase', marginBottom: 8 }}>
+            Invitación a grupo
+          </h2>
+          <p style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 20 }}>
+            Te invitaron a unirte y competir en esta polla.
+          </p>
+
+          {!joined ? (
+            <button
+              className="btn btn-primary btn-block"
+              onClick={() => void handleJoin()}
+              disabled={!groupId}
+            >
+              Unirme al grupo
+            </button>
+          ) : (
+            <>
+              <div style={{
+                padding: '14px 18px', borderRadius: 10,
+                background: 'rgba(198,255,50,.08)', border: '1px solid rgba(198,255,50,.2)',
+                marginBottom: 14,
+              }}>
+                <p style={{ color: 'var(--lime)', fontWeight: 700, fontSize: 15 }}>
+                  ¡Listo! Ya eres miembro del grupo.
+                </p>
+              </div>
+              <Link to="/" className="btn btn-primary btn-block" style={{ textDecoration: 'none', display: 'block' }}>
+                Ir al dashboard
+              </Link>
+            </>
+          )}
+
+          {error && <p className="error-msg" style={{ marginTop: 14 }}>{error}</p>}
+        </div>
       </div>
-    </main>
+    </>
   )
 }
