@@ -16,6 +16,7 @@ export type GroupMember = {
 export type Fixture = {
   id: number
   stage: string
+  group_label: string | null
   kickoff_at: string
   status: 'scheduled' | 'live' | 'finished'
   outcome: MatchPick | null

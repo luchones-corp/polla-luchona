@@ -26,6 +26,7 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
   const [stageFilter, setStageFilter] = useState<StageFilter>('todos')
   const [dateFilter, setDateFilter] = useState<DateFilter>('todos')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos')
+  const [groupFilter, setGroupFilter] = useState<string>('todos')
 
   const stageOptions: { value: StageFilter; label: string }[] = [
     { value: 'todos', label: t('partidos.all') },
@@ -47,22 +48,64 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
     { value: 'predicho', label: t('partidos.predicted') },
   ]
 
+  // Collect available group letters from fixtures
+  const availableGroups = useMemo(() => {
+    const labels = new Set<string>()
+    for (const f of fixtures) {
+      if (f.stage === 'group' && f.group_label) labels.add(f.group_label)
+    }
+    return [...labels].sort()
+  }, [fixtures])
+
+  // Show group filter when viewing group stage matches and group data exists
+  const showGroupFilter = availableGroups.length > 0 && (stageFilter === 'todos' || stageFilter === 'group')
+
   const filtered = useMemo(() => {
     return fixtures.filter(f => {
       if (stageFilter !== 'todos' && f.stage !== stageFilter) return false
+      if (showGroupFilter && groupFilter !== 'todos') {
+        if (f.stage !== 'group' || f.group_label !== groupFilter) return false
+      }
       if (dateFilter === 'hoy' && !isToday(f.kickoff_at)) return false
       if (dateFilter === 'mañana' && !isTomorrow(f.kickoff_at)) return false
       if (statusFilter === 'pendiente' && (!isBeforeKickoff(f.kickoff_at) || !!predictionsByMatch[f.id])) return false
       if (statusFilter === 'predicho' && !predictionsByMatch[f.id]) return false
       return true
     })
-  }, [fixtures, predictionsByMatch, stageFilter, dateFilter, statusFilter])
+  }, [fixtures, predictionsByMatch, stageFilter, dateFilter, statusFilter, groupFilter, showGroupFilter])
 
   const PER_PAGE = 10
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
   const safePage = Math.min(page, totalPages - 1)
   const paged = filtered.slice(safePage * PER_PAGE, (safePage + 1) * PER_PAGE)
   const pending = fixtures.filter(f => isBeforeKickoff(f.kickoff_at) && !predictionsByMatch[f.id]).length
+
+  // Build section groups for rendering with headers
+  const sections = useMemo(() => {
+    const result: { label: string | null; fixtures: Fixture[] }[] = []
+    let currentLabel: string | null = null
+    let currentGroup: Fixture[] = []
+
+    for (const f of paged) {
+      const label = f.stage === 'group' && f.group_label
+        ? `${t('partidos.groupLabel')} ${f.group_label}`
+        : null
+
+      if (label !== currentLabel) {
+        if (currentGroup.length > 0) {
+          result.push({ label: currentLabel, fixtures: currentGroup })
+        }
+        currentLabel = label
+        currentGroup = [f]
+      } else {
+        currentGroup.push(f)
+      }
+    }
+    if (currentGroup.length > 0) {
+      result.push({ label: currentLabel, fixtures: currentGroup })
+    }
+    return result
+  }, [paged, t])
 
   function changeFilter<T>(setter: (v: T) => void, value: T) {
     setter(value)
@@ -86,9 +129,39 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
       <div className="filter-bar">
         <div className="filter-group">
           {stageOptions.map(o => (
-            <button key={o.value} className={'chip' + (stageFilter === o.value ? ' chip-lime' : '')} onClick={() => changeFilter(setStageFilter, o.value)}>{o.label}</button>
+            <button
+              key={o.value}
+              className={'chip' + (stageFilter === o.value ? ' chip-lime' : '')}
+              onClick={() => {
+                changeFilter(setStageFilter, o.value)
+                if (o.value !== 'todos' && o.value !== 'group') setGroupFilter('todos')
+              }}
+            >
+              {o.label}
+            </button>
           ))}
         </div>
+
+        {showGroupFilter && (
+          <div className="filter-group">
+            <button
+              className={'chip' + (groupFilter === 'todos' ? ' chip-lime' : '')}
+              onClick={() => changeFilter(setGroupFilter, 'todos')}
+            >
+              {t('partidos.allGroups')}
+            </button>
+            {availableGroups.map(g => (
+              <button
+                key={g}
+                className={'chip' + (groupFilter === g ? ' chip-lime' : '')}
+                onClick={() => changeFilter(setGroupFilter, g)}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="filter-group">
           {dateOptions.map(o => (
             <button key={o.value} className={'chip' + (dateFilter === o.value ? ' chip-lime' : '')} onClick={() => changeFilter(setDateFilter, o.value)}>{o.label}</button>
@@ -107,8 +180,17 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
             <p style={{ color: 'var(--ink-2)' }}>{t('partidos.noMatches')}</p>
           </div>
         )}
-        {paged.map(f => (
-          <FixtureCard key={f.id} fixture={f} prediction={predictionsByMatch[f.id]} groupPicks={groupPredictionsByMatch[f.id]} onPick={onPick} onScoreChange={onScoreChange} groupId={groupId} userId={userId} reactions={reactionsByMatch?.[f.id]} lockMinutesBefore={lockMinutesBefore} />
+        {sections.map((section, i) => (
+          <div key={i}>
+            {section.label && (
+              <div className="fx-group-header">
+                <span>{section.label}</span>
+              </div>
+            )}
+            {section.fixtures.map(f => (
+              <FixtureCard key={f.id} fixture={f} prediction={predictionsByMatch[f.id]} groupPicks={groupPredictionsByMatch[f.id]} onPick={onPick} onScoreChange={onScoreChange} groupId={groupId} userId={userId} reactions={reactionsByMatch?.[f.id]} lockMinutesBefore={lockMinutesBefore} />
+            ))}
+          </div>
         ))}
       </div>
       {totalPages > 1 && (

@@ -49,6 +49,7 @@ type TeamRow = { id: number; name: string; logo_url: string | null }
 type MatchRow = {
   id: number
   stage: 'group' | 'r32' | 'r16' | 'qf' | 'sf' | 'final'
+  group_label: string | null
   home_team_id: number | null
   away_team_id: number | null
   kickoff_at: string
@@ -254,9 +255,13 @@ function toRows(apiMatches: ApiMatch[]) {
     const status = mapStatus(m.status)
     const { ft_home, ft_away } = getScores(m.score, status)
 
+    // Extract group letter from API value like "GROUP_A" → "A"
+    const groupLabel = m.group ? m.group.replace('GROUP_', '') : null
+
     matches.push({
       id:            m.id,
       stage:         mapStage(m.stage),
+      group_label:   groupLabel,
       home_team_id:  m.homeTeam.id ?? null,
       away_team_id:  m.awayTeam.id ?? null,
       kickoff_at:    m.utcDate,

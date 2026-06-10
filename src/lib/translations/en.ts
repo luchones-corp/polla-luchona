@@ -96,6 +96,8 @@ export const en: Record<string, string> = {
   'partidos.tomorrow': 'Tomorrow',
   'partidos.unpredicted': 'Unpredicted',
   'partidos.predicted': 'Predicted',
+  'partidos.groupLabel': 'Group',
+  'partidos.allGroups': 'All',
   'partidos.noMatches': 'No matches with these filters.',
   'partidos.prev': '← Previous',
   'partidos.next': 'Next →',
