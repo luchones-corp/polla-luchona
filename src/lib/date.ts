@@ -12,3 +12,16 @@ export function formatLocalKickoff(iso: string): string {
 export function isBeforeKickoff(iso: string): boolean {
   return new Date(iso).getTime() > Date.now()
 }
+
+export function isToday(iso: string): boolean {
+  const d = new Date(iso)
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+}
+
+export function isTomorrow(iso: string): boolean {
+  const d = new Date(iso)
+  const tom = new Date()
+  tom.setDate(tom.getDate() + 1)
+  return d.getFullYear() === tom.getFullYear() && d.getMonth() === tom.getMonth() && d.getDate() === tom.getDate()
+}

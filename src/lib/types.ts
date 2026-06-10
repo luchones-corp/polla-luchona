@@ -24,6 +24,8 @@ export type Fixture = {
   away_team_name: string
   home_team_logo: string | null
   away_team_logo: string | null
+  ft_home: number | null
+  ft_away: number | null
 }
 
 export type Prediction = {
@@ -38,4 +40,11 @@ export type Standing = {
   user_id: string
   display_name: string | null
   points: number
+}
+
+export type GroupPrediction = {
+  match_id: number
+  user_id: string
+  display_name: string | null
+  pick: MatchPick
 }

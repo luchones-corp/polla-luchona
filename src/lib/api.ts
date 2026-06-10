@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import type { Fixture, Group, GroupMember, MatchPick, Prediction, Standing } from './types'
+import type { Fixture, Group, GroupMember, GroupPrediction, MatchPick, Prediction, Standing } from './types'
 
 export async function getProfileDisplayName(userId: string): Promise<string | null> {
   const { data, error } = await supabase
@@ -94,7 +94,7 @@ export async function getGroupMembers(groupId: string): Promise<GroupMember[]> {
 export async function getFixtures(): Promise<Fixture[]> {
   const { data, error } = await supabase
     .from('matches')
-    .select('id, stage, kickoff_at, status, outcome, home_team_id, away_team_id, home_team:teams!matches_home_team_id_fkey(name, logo_url), away_team:teams!matches_away_team_id_fkey(name, logo_url)')
+    .select('id, stage, kickoff_at, status, outcome, ft_home, ft_away, home_team_id, away_team_id, home_team:teams!matches_home_team_id_fkey(name, logo_url), away_team:teams!matches_away_team_id_fkey(name, logo_url)')
     .order('kickoff_at', { ascending: true })
 
   if (error) throw error
@@ -111,6 +111,8 @@ export async function getFixtures(): Promise<Fixture[]> {
     away_team_name: row.away_team?.name ?? 'Por definir',
     home_team_logo: row.home_team?.logo_url ?? null,
     away_team_logo: row.away_team?.logo_url ?? null,
+    ft_home: row.ft_home ?? null,
+    ft_away: row.ft_away ?? null,
   }))
 }
 
@@ -132,12 +134,62 @@ export async function savePrediction(userId: string, matchId: number, pick: Matc
   if (error) throw error
 }
 
+export async function getGroupPredictions(groupId: string): Promise<GroupPrediction[]> {
+  const { data, error } = await supabase.rpc('get_group_predictions', { target_group_id: groupId })
+  if (error) throw error
+  return (data ?? []) as GroupPrediction[]
+}
+
 export async function getStandings(groupId: string): Promise<Standing[]> {
   const { data, error } = await supabase
     .from('group_standings')
     .select('group_id, user_id, display_name, points')
     .eq('group_id', groupId)
 
+  if (error) throw error
+  return (data ?? []) as Standing[]
+}
+
+export type GroupMessage = {
+  id: string
+  group_id: string
+  user_id: string
+  display_name: string | null
+  body: string
+  created_at: string
+}
+
+export async function getGroupMessages(groupId: string, limit = 50): Promise<GroupMessage[]> {
+  const { data, error } = await supabase
+    .from('group_messages')
+    .select('id, group_id, user_id, body, created_at, profiles!inner(display_name)')
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) throw error
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    group_id: row.group_id,
+    user_id: row.user_id,
+    display_name: row.profiles?.display_name ?? null,
+    body: row.body,
+    created_at: row.created_at,
+  })).reverse()
+}
+
+export async function sendGroupMessage(groupId: string, userId: string, body: string): Promise<void> {
+  const { error } = await supabase
+    .from('group_messages')
+    .insert({ group_id: groupId, user_id: userId, body: body.trim() })
+  if (error) throw error
+}
+
+export async function getStageStandings(groupId: string, stage?: string): Promise<Standing[]> {
+  const { data, error } = await supabase.rpc('get_stage_standings', {
+    target_group_id: groupId,
+    target_stage: stage ?? null,
+  })
   if (error) throw error
   return (data ?? []) as Standing[]
 }
