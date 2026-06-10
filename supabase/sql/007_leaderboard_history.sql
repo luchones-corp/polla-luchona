@@ -32,7 +32,7 @@ BEGIN
     sub.display_name,
     sub.match_id,
     sub.kickoff_at,
-    SUM(sub.pts)::int OVER (PARTITION BY sub.user_id ORDER BY sub.kickoff_at, sub.match_id) AS cumulative_points
+    (SUM(sub.pts) OVER (PARTITION BY sub.user_id ORDER BY sub.kickoff_at, sub.match_id))::int AS cumulative_points
   FROM (
     SELECT
       gm.user_id,

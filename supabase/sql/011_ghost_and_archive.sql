@@ -1,39 +1,6 @@
--- Phase 7: Ghost/Bot Player + Seasonal Archive
-
--- Ghost player profile
-INSERT INTO public.profiles (id, display_name)
-VALUES ('00000000-0000-0000-0000-000000000000', 'Random Bot')
-ON CONFLICT DO NOTHING;
-
--- RPC to add ghost player to a group (owner only)
-CREATE OR REPLACE FUNCTION public.add_ghost_player(target_group_id uuid)
-RETURNS void
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  requester uuid := auth.uid();
-  ghost_id uuid := '00000000-0000-0000-0000-000000000000';
-BEGIN
-  IF requester IS NULL THEN
-    RAISE EXCEPTION 'Not authenticated';
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM public.groups g
-    WHERE g.id = target_group_id AND g.owner_id = requester
-  ) THEN
-    RAISE EXCEPTION 'Only the group owner can add the bot';
-  END IF;
-
-  INSERT INTO public.group_members (group_id, user_id)
-  VALUES (target_group_id, ghost_id)
-  ON CONFLICT DO NOTHING;
-END;
-$$;
-
-GRANT EXECUTE ON FUNCTION public.add_ghost_player(uuid) TO authenticated;
+-- Phase 7: Seasonal Archive
+-- Note: Ghost bot feature removed — inserting into profiles requires a matching
+-- auth.users entry, which can't be done via SQL Editor alone.
 
 -- Seasonal archive table
 CREATE TABLE IF NOT EXISTS public.group_archives (
