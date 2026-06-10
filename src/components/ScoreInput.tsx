@@ -8,8 +8,10 @@ export function ScoreInput({ fixture, scoreHome, scoreAway, onChange, disabled }
   disabled?: boolean
 }) {
   function handleChange(side: 'home' | 'away', raw: string) {
-    const val = raw === '' ? null : Math.max(0, Math.min(20, parseInt(raw, 10)))
-    if (raw !== '' && isNaN(val as number)) return
+    // Strip non-digits
+    const digits = raw.replace(/\D/g, '')
+    // Empty → null, otherwise take last digit typed (0-9)
+    const val = digits === '' ? null : Math.min(Number(digits.slice(-1)), 9)
     if (side === 'home') onChange(val, scoreAway)
     else onChange(scoreHome, val)
   }
@@ -19,28 +21,28 @@ export function ScoreInput({ fixture, scoreHome, scoreAway, onChange, disabled }
       <span className="score-input-team">{fixture.home_team_name}</span>
       <input
         className="score-input"
-        type="number"
+        type="text"
         inputMode="numeric"
-        min={0}
-        max={20}
+        pattern="[0-9]*"
+        maxLength={1}
         value={scoreHome ?? ''}
         onChange={e => handleChange('home', e.target.value)}
         disabled={disabled}
         placeholder="-"
-        aria-label={`Goles ${fixture.home_team_name}`}
+        aria-label={`${fixture.home_team_name} goals`}
       />
       <span className="score-input-sep">-</span>
       <input
         className="score-input"
-        type="number"
+        type="text"
         inputMode="numeric"
-        min={0}
-        max={20}
+        pattern="[0-9]*"
+        maxLength={1}
         value={scoreAway ?? ''}
         onChange={e => handleChange('away', e.target.value)}
         disabled={disabled}
         placeholder="-"
-        aria-label={`Goles ${fixture.away_team_name}`}
+        aria-label={`${fixture.away_team_name} goals`}
       />
       <span className="score-input-team">{fixture.away_team_name}</span>
     </div>

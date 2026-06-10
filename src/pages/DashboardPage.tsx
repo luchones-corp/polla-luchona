@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import {
@@ -171,25 +171,14 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     }
   }
 
-  async function handleScoreChange(matchId: number, scoreHome: number | null, scoreAway: number | null) {
+  const scoreTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
+  const saveScore = useCallback(async (matchId: number, scoreHome: number | null, scoreAway: number | null) => {
     const existing = predictionsByMatch[matchId]
     const pick = scoreHome !== null && scoreAway !== null
       ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
       : existing?.pick
-    if (!pick) {
-      setPredictionsByMatch(current => ({
-        ...current,
-        [matchId]: {
-          id: current[matchId]?.id ?? `local-${matchId}`,
-          match_id: matchId,
-          pick: current[matchId]?.pick ?? 'HOME',
-          score_home: scoreHome,
-          score_away: scoreAway,
-          updated_at: new Date().toISOString(),
-        },
-      }))
-      return
-    }
+    if (!pick) return
     setError(null)
     try {
       await savePrediction(session.user.id, matchId, pick, scoreHome, scoreAway)
@@ -213,6 +202,31 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       }
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.predError'))
+    }
+  }, [predictionsByMatch, session.user.id, selectedGroupId])
+
+  function handleScoreChange(matchId: number, scoreHome: number | null, scoreAway: number | null) {
+    // Update UI immediately
+    setPredictionsByMatch(current => ({
+      ...current,
+      [matchId]: {
+        id: current[matchId]?.id ?? `local-${matchId}`,
+        match_id: matchId,
+        pick: current[matchId]?.pick ?? (scoreHome !== null && scoreAway !== null
+          ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
+          : 'HOME'),
+        score_home: scoreHome,
+        score_away: scoreAway,
+        updated_at: new Date().toISOString(),
+      },
+    }))
+
+    // Debounce API call — only save when both scores are filled
+    clearTimeout(scoreTimers.current[matchId])
+    if (scoreHome !== null && scoreAway !== null) {
+      scoreTimers.current[matchId] = setTimeout(() => {
+        void saveScore(matchId, scoreHome, scoreAway)
+      }, 600)
     }
   }
 
