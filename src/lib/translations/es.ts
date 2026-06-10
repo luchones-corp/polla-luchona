@@ -58,8 +58,7 @@ export const es: Record<string, string> = {
   'dash.groupNameLabel': 'Nombre del grupo',
   'dash.groupNamePlaceholder': 'ej. Polla Luchona',
   'dash.createBtn': 'Crear grupo',
-  'dash.soundOn': 'Activar sonidos',
-  'dash.soundOff': 'Silenciar',
+
   'dash.notifOff': 'Desactivar notificaciones',
   'dash.notifOn': 'Activar notificaciones',
   'dash.achievements': 'Logros',

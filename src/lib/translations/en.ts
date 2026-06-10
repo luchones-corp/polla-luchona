@@ -58,8 +58,7 @@ export const en: Record<string, string> = {
   'dash.groupNameLabel': 'Group name',
   'dash.groupNamePlaceholder': 'e.g. The Champs',
   'dash.createBtn': 'Create group',
-  'dash.soundOn': 'Enable sounds',
-  'dash.soundOff': 'Mute',
+
   'dash.notifOff': 'Disable notifications',
   'dash.notifOn': 'Enable notifications',
   'dash.achievements': 'Achievements',

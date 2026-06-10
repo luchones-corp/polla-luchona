@@ -25,7 +25,7 @@ import { TablaView } from '../components/TablaView'
 import { GrupoView } from '../components/GrupoView'
 import { useNotificationBadge } from '../hooks/useNotifications'
 import { usePushSubscription } from '../hooks/usePushSubscription'
-import { useSound } from '../hooks/useSound'
+
 import { useTheme } from '../hooks/useTheme'
 import { usePWAInstall } from '../hooks/usePWAInstall'
 import { useLocale } from '../contexts/LocaleContext'
@@ -65,7 +65,6 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const { theme, toggleTheme } = useTheme()
   const { canInstall, promptInstall } = usePWAInstall()
   const { isSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription(session.user.id)
-  const { play, muted, toggleMute } = useSound()
   const { locale, setLocale, t } = useLocale()
   const navigate = useNavigate()
   const hasLive = fixtures.some(f => f.status === 'live')
@@ -162,7 +161,6 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
           updated_at: new Date().toISOString(),
         },
       }))
-      play('whistle')
       showToast(t('dash.predSaved'))
       if (selectedGroupId) {
         const refreshedStandings = await getStandings(selectedGroupId)
@@ -299,20 +297,6 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
               style={{ fontFamily: 'var(--font-head)', fontWeight: 800, fontSize: 12, letterSpacing: '.04em' }}
             >
               {locale === 'es' ? 'EN' : 'ES'}
-            </button>
-            <button className="btn btn-ghost btn-sm" onClick={toggleMute} title={muted ? t('dash.soundOn') : t('dash.soundOff')}>
-              {muted ? (
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                  <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
-                  <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
-                </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
-                  <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
             </button>
             {pushSupported && (
               <button
