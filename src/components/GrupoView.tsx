@@ -6,13 +6,14 @@ import { updateGroupLockMinutes } from '../lib/api'
 import { useLocale } from '../contexts/LocaleContext'
 import type { Group, GroupMember } from '../lib/types'
 
-export function GrupoView({ selectedGroup, isOwner, members, session, onRegenerateInvite, onRemoveMember, toast, onGroupUpdated }: {
+export function GrupoView({ selectedGroup, isOwner, members, session, onRegenerateInvite, onRemoveMember, onLeaveGroup, toast, onGroupUpdated }: {
   selectedGroup: Group | null
   isOwner: boolean
   members: GroupMember[]
   session: Session
   onRegenerateInvite: () => void
   onRemoveMember: (id: string) => void
+  onLeaveGroup: () => void
   toast: (msg: string) => void
   onGroupUpdated?: () => void
 }) {
@@ -100,6 +101,11 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
               </div>
             ))}
           </div>
+          {!isOwner && (
+            <button className="btn btn-danger btn-sm" style={{ marginTop: 16, width: '100%' }} onClick={onLeaveGroup}>
+              {t('grupo.leave')}
+            </button>
+          )}
         </div>
       </div>
 

@@ -248,6 +248,45 @@ button, input { font-family: inherit; }
 .nav-desk button.on { color: var(--lime); background: rgba(198,255,50,.1); }
 .nav-desk button svg { width: 17px; height: 17px; }
 
+/* group switcher */
+.brand { position: relative; }
+.group-switcher {
+  all: unset; cursor: pointer; display: flex; align-items: center; gap: 5px;
+  font-style: normal; font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--ink-3); font-weight: 700; font-family: var(--font-head); margin-top: 3px;
+  white-space: nowrap; transition: color .15s;
+}
+.group-switcher:hover { color: var(--lime); }
+.group-switcher-chevron { transition: transform .2s; flex-shrink: 0; }
+.group-switcher-chevron.open { transform: rotate(180deg); }
+.group-menu {
+  position: absolute; top: calc(100% + 8px); left: 0; z-index: 60;
+  min-width: 200px; max-width: 280px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r);
+  box-shadow: 0 12px 40px rgba(0,0,0,.4); padding: 6px 0;
+  animation: fadeSlideDown .15s ease;
+}
+@keyframes fadeSlideDown { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+.group-menu-item {
+  all: unset; display: flex; align-items: center; justify-content: space-between;
+  width: 100%; box-sizing: border-box; padding: 9px 14px; cursor: pointer;
+  font-family: var(--font-head); font-weight: 700; font-size: 13px; color: var(--ink-2);
+  transition: background .12s, color .12s;
+}
+.group-menu-item:hover { background: var(--surface-2); color: var(--ink); }
+.group-menu-item.active { color: var(--lime); }
+.group-menu-check { font-size: 14px; color: var(--lime); margin-left: 8px; }
+.group-menu-divider { height: 1px; background: var(--line); margin: 4px 0; }
+.group-menu-create { color: var(--lime); }
+.group-menu-create:hover { background: rgba(198,255,50,.08); }
+
+/* create group modal */
+.create-group-overlay {
+  position: fixed; inset: 0; z-index: 100; background: rgba(0,0,0,.55);
+  display: grid; place-items: center; padding: 1rem; backdrop-filter: blur(4px);
+}
+.create-group-modal { padding: 28px; width: min(420px, 95vw); }
+
 .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .me-chip {
   display: flex; align-items: center; gap: 9px; padding: 5px 6px 5px 12px; border-radius: 99px;

@@ -82,6 +82,11 @@ export async function regenerateInvite(groupId: string): Promise<string> {
   return data as string
 }
 
+export async function leaveGroup(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('leave_group', { target_group_id: groupId })
+  if (error) throw error
+}
+
 export async function removeGroupMember(groupId: string, memberId: string): Promise<void> {
   const { error } = await supabase.rpc('remove_group_member', {
     target_group_id: groupId,

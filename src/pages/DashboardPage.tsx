@@ -10,6 +10,7 @@ import {
   getGroupPredictions,
   getStandings,
   getUserPredictions,
+  leaveGroup,
   regenerateInvite,
   removeGroupMember,
   savePrediction,
@@ -37,7 +38,9 @@ type View = 'partidos' | 'tabla' | 'grupo' | 'en-vivo'
 export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const [view, setView] = useState<View>('partidos')
   const [groups, setGroups] = useState<Group[]>([])
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(() => localStorage.getItem('selectedGroupId'))
+  const [showGroupMenu, setShowGroupMenu] = useState(false)
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [fixtures, setFixtures] = useState<Fixture[]>([])
   const [predictionsByMatch, setPredictionsByMatch] = useState<Record<number, Prediction>>({})
   const [members, setMembers] = useState<GroupMember[]>([])
@@ -68,6 +71,25 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const { locale, setLocale, t } = useLocale()
   const navigate = useNavigate()
   const hasLive = fixtures.some(f => f.status === 'live')
+  const groupMenuRef = useRef<HTMLDivElement>(null)
+
+  // Persist selected group to localStorage
+  useEffect(() => {
+    if (selectedGroupId) localStorage.setItem('selectedGroupId', selectedGroupId)
+    else localStorage.removeItem('selectedGroupId')
+  }, [selectedGroupId])
+
+  // Close group menu on click outside
+  useEffect(() => {
+    if (!showGroupMenu) return
+    function handleClick(e: MouseEvent) {
+      if (groupMenuRef.current && !groupMenuRef.current.contains(e.target as Node)) {
+        setShowGroupMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [showGroupMenu])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -137,11 +159,25 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     try {
       const created = await createGroup(name)
       setNewGroupName('')
+      setShowCreateGroup(false)
       await reloadBaseData()
       setSelectedGroupId(created.id)
       showToast(t('dash.groupCreated'))
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.createError'))
+    }
+  }
+
+  async function handleLeaveGroup() {
+    if (!selectedGroupId || isOwner) return
+    if (!window.confirm(t('grupo.leaveConfirm'))) return
+    setError(null)
+    try {
+      await leaveGroup(selectedGroupId)
+      showToast(t('grupo.left'))
+      await reloadBaseData()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : t('grupo.leaveError'))
     }
   }
 
@@ -287,9 +323,34 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     <div className="shell">
       <header className="topbar">
         <div className="topbar-in">
-          <div className="brand">
+          <div className="brand" ref={groupMenuRef}>
             <div className="brand-mark"><span>LP</span></div>
-            <div className="brand-txt"><b>{t('brand.name')}</b><em>{selectedGroup?.name ?? t('brand.subtitle')}</em></div>
+            <div className="brand-txt">
+              <b>{t('brand.name')}</b>
+              {groups.length <= 1
+                ? <em>{selectedGroup?.name ?? t('brand.subtitle')}</em>
+                : <button className="group-switcher" onClick={() => setShowGroupMenu(v => !v)}>
+                    {selectedGroup?.name ?? t('brand.subtitle')}
+                    <svg className={'group-switcher-chevron' + (showGroupMenu ? ' open' : '')} viewBox="0 0 12 7" width="10" height="6"><path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" /></svg>
+                  </button>
+              }
+            </div>
+            {showGroupMenu && (
+              <div className="group-menu">
+                {groups.map(g => (
+                  <button key={g.id} className={'group-menu-item' + (g.id === selectedGroupId ? ' active' : '')}
+                    onClick={() => { setSelectedGroupId(g.id); setShowGroupMenu(false) }}>
+                    <span>{g.name}</span>
+                    {g.id === selectedGroupId && <span className="group-menu-check">{'\u2713'}</span>}
+                  </button>
+                ))}
+                <div className="group-menu-divider" />
+                <button className="group-menu-item group-menu-create"
+                  onClick={() => { setShowGroupMenu(false); setShowCreateGroup(true) }}>
+                  + {t('dash.createGroup')}
+                </button>
+              </div>
+            )}
           </div>
           <nav className="nav-desk">
             <button className={view === 'partidos' ? 'on' : ''} onClick={() => go('partidos')}>
@@ -414,11 +475,36 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             session={session}
             onRegenerateInvite={handleRegenerateInvite}
             onRemoveMember={handleRemoveMember}
+            onLeaveGroup={handleLeaveGroup}
             toast={showToast}
             onGroupUpdated={() => void reloadBaseData()}
           />
         )}
       </main>
+
+      {showCreateGroup && (
+        <div className="create-group-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowCreateGroup(false) }}>
+          <div className="create-group-modal card fade-in">
+            <div className="brand" style={{ marginBottom: 16 }}>
+              <div className="brand-mark"><span>LP</span></div>
+              <div className="brand-txt"><b>{t('brand.name')}</b><em>{t('brand.subtitle')}</em></div>
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 22, textTransform: 'uppercase', marginBottom: 8 }}>{t('dash.createGroup')}</h2>
+            <p style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 16 }}>{t('dash.createGroupDesc')}</p>
+            <form onSubmit={handleCreateGroup}>
+              <div className="field">
+                <label>{t('dash.groupNameLabel')}</label>
+                <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder={t('dash.groupNamePlaceholder')} required autoFocus />
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
+                <button className="btn btn-primary" type="submit" style={{ flex: 1 }}>{t('dash.createBtn')}</button>
+                <button className="btn btn-ghost" type="button" onClick={() => setShowCreateGroup(false)} style={{ flex: 0 }}>✕</button>
+              </div>
+            </form>
+            {error && <p className="error-msg" style={{ marginTop: 12 }}>{error}</p>}
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div className="toast pop-in">
