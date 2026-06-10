@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { computeAchievements, type Achievement } from '../lib/achievements'
+import { useLocale } from '../contexts/LocaleContext'
 import type { Fixture, Prediction } from '../lib/types'
 
 function AchievementCard({ a }: { a: Achievement }) {
@@ -27,15 +28,16 @@ export function AchievementsPanel({ fixtures, predictionsByMatch, onClose }: {
   predictionsByMatch: Record<number, Prediction>
   onClose: () => void
 }) {
-  const achievements = useMemo(() => computeAchievements(fixtures, predictionsByMatch), [fixtures, predictionsByMatch])
+  const { t } = useLocale()
+  const achievements = useMemo(() => computeAchievements(fixtures, predictionsByMatch, t), [fixtures, predictionsByMatch, t])
   const earned = achievements.filter(a => a.earned).length
 
   return (
     <div className="h2h-overlay" onClick={onClose}>
       <div className="card h2h-panel" onClick={e => e.stopPropagation()}>
-        <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ position: 'absolute', top: 14, right: 14 }}>✕</button>
-        <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 22, textTransform: 'uppercase', marginBottom: 4 }}>Logros</h2>
-        <p style={{ color: 'var(--ink-3)', fontSize: 13, marginBottom: 18 }}>{earned} de {achievements.length} desbloqueados</p>
+        <button className="btn btn-ghost btn-sm" onClick={onClose} style={{ position: 'absolute', top: 14, right: 14 }}>{'\u2715'}</button>
+        <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 22, textTransform: 'uppercase', marginBottom: 4 }}>{t('achievements.heading')}</h2>
+        <p style={{ color: 'var(--ink-3)', fontSize: 13, marginBottom: 18 }}>{earned} {t('common.of')} {achievements.length} {t('achievements.unlocked')}</p>
         <div className="ach-grid">
           {achievements.map(a => <AchievementCard key={a.id} a={a} />)}
         </div>

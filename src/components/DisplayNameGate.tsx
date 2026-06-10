@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { saveDisplayName } from '../lib/api'
+import { useLocale } from '../contexts/LocaleContext'
 
 type DisplayNameGateProps = {
   userId: string
@@ -7,6 +8,7 @@ type DisplayNameGateProps = {
 }
 
 export function DisplayNameGate({ userId, onSaved }: DisplayNameGateProps) {
+  const { t } = useLocale()
   const [displayName, setDisplayName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -15,7 +17,7 @@ export function DisplayNameGate({ userId, onSaved }: DisplayNameGateProps) {
     event.preventDefault()
     const trimmed = displayName.trim()
     if (!trimmed) {
-      setError('Tu nombre para mostrar es obligatorio.')
+      setError(t('displayName.required'))
       return
     }
 
@@ -26,7 +28,7 @@ export function DisplayNameGate({ userId, onSaved }: DisplayNameGateProps) {
       await saveDisplayName(userId, trimmed)
       onSaved(trimmed)
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : 'No se pudo guardar el nombre'
+      const message = caughtError instanceof Error ? caughtError.message : t('displayName.error')
       setError(message)
     } finally {
       setLoading(false)
@@ -37,26 +39,26 @@ export function DisplayNameGate({ userId, onSaved }: DisplayNameGateProps) {
     <div className="card fade-in" style={{ padding: 28, width: 'min(420px, 95vw)' }}>
       <div className="brand" style={{ marginBottom: 20 }}>
         <div className="brand-mark"><span>LP</span></div>
-        <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+        <div className="brand-txt"><b>{t('brand.name')}</b><em>{t('brand.subtitle')}</em></div>
       </div>
       <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 26, textTransform: 'uppercase', marginBottom: 8 }}>
-        Elige tu nombre
+        {t('displayName.heading')}
       </h2>
       <p style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 20 }}>
-        Este nombre aparecerá en las tablas de posiciones de tus grupos.
+        {t('displayName.desc')}
       </p>
       <form onSubmit={handleSubmit}>
         <div className="field">
-          <label>Nombre de jugador</label>
+          <label>{t('displayName.label')}</label>
           <input
             required
             value={displayName}
             onChange={(event) => setDisplayName(event.target.value)}
-            placeholder="ej. tu_apodo"
+            placeholder={t('displayName.placeholder')}
           />
         </div>
         <button className="btn btn-primary btn-block" disabled={loading} type="submit" style={{ marginTop: 8 }}>
-          {loading ? 'Guardando...' : 'Guardar y jugar'}
+          {loading ? t('displayName.saving') : t('displayName.saveBtn')}
         </button>
       </form>
       {error && <p className="error-msg" style={{ marginTop: 12, textAlign: 'center' }}>{error}</p>}

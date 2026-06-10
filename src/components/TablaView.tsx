@@ -1,34 +1,72 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Avatar } from './Avatar'
 import { HeadToHeadView } from './HeadToHeadView'
-import { getStageStandings } from '../lib/api'
+import { LeaderboardChart } from './LeaderboardChart'
+import { StandingsExport } from './StandingsExport'
+import { getLeaderboardHistory, getStageStandings } from '../lib/api'
+import { computeStreak } from '../lib/streaks'
 import { rankStandings, type RankedStanding } from '../lib/ranking'
-import type { Fixture, GroupPrediction, Prediction, Standing } from '../lib/types'
+import { useLocale } from '../contexts/LocaleContext'
+import type { Fixture, GroupPrediction, LeaderboardSnapshot, MatchPick, Prediction, Standing } from '../lib/types'
 
 type StageTab = 'general' | 'group' | 'r32' | 'r16' | 'qf' | 'sf' | 'final'
 
-const STAGE_TABS: { value: StageTab; label: string }[] = [
-  { value: 'general', label: 'General' },
-  { value: 'group', label: 'Grupos' },
-  { value: 'r32', label: 'R32' },
-  { value: 'r16', label: 'R16' },
-  { value: 'qf', label: 'Cuartos' },
-  { value: 'sf', label: 'Semis' },
-  { value: 'final', label: 'Final' },
-]
-
-export function TablaView({ rankedStandings, userId, fixtures, groupPredictions, predictionsByMatch, groupId }: {
+export function TablaView({ rankedStandings, userId, fixtures, groupPredictions, predictionsByMatch, groupId, groupName }: {
   rankedStandings: RankedStanding[]
   userId: string
   fixtures: Fixture[]
   groupPredictions: GroupPrediction[]
   predictionsByMatch: Record<number, Prediction>
   groupId: string | null
+  groupName: string
 }) {
+  const { t } = useLocale()
+  const navigate = useNavigate()
   const [h2hOpponent, setH2hOpponent] = useState<{ id: string; name: string } | null>(null)
   const [stageTab, setStageTab] = useState<StageTab>('general')
   const [stageStandings, setStageStandings] = useState<RankedStanding[] | null>(null)
   const [stageLoading, setStageLoading] = useState(false)
+  const [showChart, setShowChart] = useState(false)
+  const [chartData, setChartData] = useState<LeaderboardSnapshot[] | null>(null)
+  const [chartLoading, setChartLoading] = useState(false)
+
+  const stageTabs: { value: StageTab; label: string }[] = [
+    { value: 'general', label: t('tabla.general') },
+    { value: 'group', label: t('tabla.groups') },
+    { value: 'r32', label: 'R32' },
+    { value: 'r16', label: 'R16' },
+    { value: 'qf', label: t('tabla.qf') },
+    { value: 'sf', label: t('tabla.sf') },
+    { value: 'final', label: t('tabla.final') },
+  ]
+
+  useEffect(() => {
+    if (!showChart || !groupId || chartData !== null) return
+    let mounted = true
+    setChartLoading(true)
+    getLeaderboardHistory(groupId)
+      .then(d => { if (mounted) setChartData(d) })
+      .catch(() => { if (mounted) setChartData([]) })
+      .finally(() => { if (mounted) setChartLoading(false) })
+    return () => { mounted = false }
+  }, [showChart, groupId, chartData])
+
+  const memberStreaks = useMemo(() => {
+    const streakMap: Record<string, number> = {}
+    const memberIds = new Set(groupPredictions.map(gp => gp.user_id))
+    for (const uid of memberIds) {
+      const memberPreds: Record<number, Prediction> = {}
+      for (const gp of groupPredictions) {
+        if (gp.user_id === uid) {
+          memberPreds[gp.match_id] = { id: 'x', match_id: gp.match_id, pick: gp.pick as MatchPick, score_home: gp.score_home, score_away: gp.score_away, updated_at: '' }
+        }
+      }
+      const { current } = computeStreak(fixtures, memberPreds)
+      if (current >= 3) streakMap[uid] = current
+    }
+    return streakMap
+  }, [fixtures, groupPredictions])
 
   useEffect(() => {
     if (stageTab === 'general' || !groupId) {
@@ -60,26 +98,42 @@ export function TablaView({ rankedStandings, userId, fixtures, groupPredictions,
   return (
     <div className="wrap fade-in">
       <div className="sec-head">
-        <h2>Tabla de posiciones</h2>
-        <span className="chip">{activeStandings.length} jugadores</span>
+        <h2>{t('tabla.heading')}</h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <StandingsExport standings={activeStandings} groupName={groupName} />
+          <button className={'chip' + (showChart ? ' chip-lime' : '')} onClick={() => setShowChart(v => !v)}>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.2" style={{ marginRight: 4 }}>
+              <path d="M3 3v18h18" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M7 16l4-8 4 4 5-10" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {showChart ? t('tabla.showTable') : t('tabla.showChart')}
+          </button>
+          <span className="chip">{activeStandings.length} {t('tabla.players')}</span>
+        </div>
       </div>
 
       <div className="filter-bar" style={{ marginBottom: 20 }}>
         <div className="filter-group">
-          {STAGE_TABS.map(t => (
+          {stageTabs.map(tab => (
             <button
-              key={t.value}
-              className={'chip' + (stageTab === t.value ? ' chip-lime' : '')}
-              onClick={() => setStageTab(t.value)}
+              key={tab.value}
+              className={'chip' + (stageTab === tab.value ? ' chip-lime' : '')}
+              onClick={() => setStageTab(tab.value)}
             >
-              {t.label}
+              {tab.label}
             </button>
           ))}
         </div>
       </div>
 
-      {stageLoading ? (
-        <p style={{ color: 'var(--ink-3)', textAlign: 'center', padding: 24 }}>Cargando...</p>
+      {showChart ? (
+        chartLoading ? (
+          <p style={{ color: 'var(--ink-3)', textAlign: 'center', padding: 24 }}>{t('tabla.loadingChart')}</p>
+        ) : (
+          <LeaderboardChart data={chartData ?? []} userId={userId} />
+        )
+      ) : stageLoading ? (
+        <p style={{ color: 'var(--ink-3)', textAlign: 'center', padding: 24 }}>{t('tabla.loading')}</p>
       ) : (
         <>
           {podiumOrder && (
@@ -92,13 +146,13 @@ export function TablaView({ rankedStandings, userId, fixtures, groupPredictions,
                   onClick={() => s.user_id !== userId && setH2hOpponent({ id: s.user_id, name: s.display_name ?? '?' })}
                 >
                   <div className="rk">{s.rank}</div>
-                  {s.rank === 1 && <div style={{ fontSize: 20 }}>👑</div>}
+                  {s.rank === 1 && <div style={{ fontSize: 20 }}>{'\uD83D\uDC51'}</div>}
                   <Avatar name={s.display_name ?? '?'} size={s.rank === 1 ? 56 : 46} />
                   <div className="pname">
-                    {s.display_name ?? 'Sin nombre'}
-                    {s.user_id === userId && <span className="you-tag" style={{ marginLeft: 6 }}>TÚ</span>}
+                    {s.display_name ?? t('tabla.noName')}
+                    {s.user_id === userId && <span className="you-tag" style={{ marginLeft: 6 }}>{t('tabla.you')}</span>}
                   </div>
-                  <div className="ppts tabnum">{s.points}<i> pts</i></div>
+                  <div className="ppts tabnum">{s.points}<i> {t('tabla.pts')}</i></div>
                 </div>
               ))}
             </div>
@@ -117,13 +171,27 @@ export function TablaView({ rankedStandings, userId, fixtures, groupPredictions,
                   <Avatar name={s.display_name ?? '?'} size={38} />
                   <div style={{ minWidth: 0 }}>
                     <div className="un">
-                      {s.display_name ?? 'Sin nombre'}
-                      {s.user_id === userId && <span className="you-tag" style={{ marginLeft: 8 }}>TÚ</span>}
+                      {s.display_name ?? t('tabla.noName')}
+                      {s.user_id === userId && <span className="you-tag" style={{ marginLeft: 8 }}>{t('tabla.you')}</span>}
+                      {memberStreaks[s.user_id] && <span className="streak-flame">{'\uD83D\uDD25'}{memberStreaks[s.user_id]}</span>}
                     </div>
-                    {s.user_id !== userId && <div style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>Toca para comparar</div>}
+                    {s.user_id !== userId && (
+                      <div style={{ display: 'flex', gap: 10, fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                        <span>{t('tabla.compare')}</span>
+                        <span
+                          className="profile-link"
+                          onClick={(e) => { e.stopPropagation(); navigate(`/profile/${s.user_id}`) }}
+                        >
+                          {t('tabla.viewProfile')}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <div className="lb-pts tabnum">{s.points}<i>pts</i></div>
+                <div className="lb-pts tabnum">
+                  {s.points}<i>{t('tabla.pts')}</i>
+                  {s.exact_count > 0 && <span className="lb-exact">{s.exact_count} {s.exact_count > 1 ? t('tabla.exacts') : t('tabla.exact')}</span>}
+                </div>
               </div>
             ))}
           </div>

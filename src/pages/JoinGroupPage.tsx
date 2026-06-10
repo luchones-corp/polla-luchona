@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { getGroupByInviteToken, getProfileDisplayName, joinGroupByToken } from '../lib/api'
+import { useLocale } from '../contexts/LocaleContext'
 import { AuthForm } from '../components/AuthForm'
 import { DisplayNameGate } from '../components/DisplayNameGate'
 
@@ -11,6 +12,7 @@ type JoinGroupPageProps = {
 
 export function JoinGroupPage({ session }: JoinGroupPageProps) {
   const { token = '' } = useParams()
+  const { t } = useLocale()
   const [groupName, setGroupName] = useState<string | null>(null)
   const [groupId, setGroupId] = useState<string | null>(null)
   const [displayName, setDisplayName] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
         ])
         if (!mounted) return
         if (!group) {
-          setError('Este enlace de invitación ya no es válido.')
+          setError(t('join.invalidLink'))
         } else {
           setGroupName(group.name)
           setGroupId(group.id)
@@ -44,7 +46,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
         setDisplayName(name)
       } catch (caughtError) {
         if (!mounted) return
-        const message = caughtError instanceof Error ? caughtError.message : 'No se pudo validar el enlace'
+        const message = caughtError instanceof Error ? caughtError.message : t('join.validationError')
         setError(message)
       } finally {
         if (mounted) setLoading(false)
@@ -61,7 +63,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
       await joinGroupByToken(token)
       setJoined(true)
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : 'No se pudo unir al grupo'
+      const message = caughtError instanceof Error ? caughtError.message : t('join.joinError')
       setError(message)
     }
   }
@@ -75,7 +77,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
       <>
         <div className="stage-bg" />
         <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-          <p style={{ fontFamily: 'var(--font-head)', fontWeight: 700, color: 'var(--ink-2)' }}>Validando enlace...</p>
+          <p style={{ fontFamily: 'var(--font-head)', fontWeight: 700, color: 'var(--ink-2)' }}>{t('join.validating')}</p>
         </div>
       </>
     )
@@ -93,7 +95,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
             />
             {groupName && (
               <p style={{ textAlign: 'center', color: 'var(--ink-2)', fontSize: 14, marginTop: 14 }}>
-                Después podrás unirte a <strong style={{ color: 'var(--ink-1)' }}>{groupName}</strong>.
+                {t('join.afterSetup')} <strong style={{ color: 'var(--ink-1)' }}>{groupName}</strong>.
               </p>
             )}
           </div>
@@ -109,7 +111,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
         <div className="card fade-in" style={{ padding: 28, width: 'min(420px, 95vw)', textAlign: 'center' }}>
           <div className="brand" style={{ marginBottom: 20, justifyContent: 'center' }}>
             <div className="brand-mark"><span>LP</span></div>
-            <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+            <div className="brand-txt"><b>{t('brand.name')}</b><em>{t('brand.subtitle')}</em></div>
           </div>
 
           {groupName && (
@@ -127,16 +129,16 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
               </div>
               <div style={{ textAlign: 'left' }}>
                 <h3 style={{ fontFamily: 'var(--font-disp)', fontSize: 18, textTransform: 'uppercase' }}>{groupName}</h3>
-                <div style={{ color: 'var(--ink-3)', fontSize: 12, fontWeight: 600 }}>Mundial 2026</div>
+                <div style={{ color: 'var(--ink-3)', fontSize: 12, fontWeight: 600 }}>{t('brand.subtitle')}</div>
               </div>
             </div>
           )}
 
           <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 24, textTransform: 'uppercase', marginBottom: 8 }}>
-            Invitación a grupo
+            {t('join.heading')}
           </h2>
           <p style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 20 }}>
-            Te invitaron a unirte y competir en esta polla.
+            {t('join.desc')}
           </p>
 
           {!joined ? (
@@ -145,7 +147,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
               onClick={() => void handleJoin()}
               disabled={!groupId}
             >
-              Unirme al grupo
+              {t('join.btn')}
             </button>
           ) : (
             <>
@@ -155,11 +157,11 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
                 marginBottom: 14,
               }}>
                 <p style={{ color: 'var(--lime)', fontWeight: 700, fontSize: 15 }}>
-                  ¡Listo! Ya eres miembro del grupo.
+                  {t('join.success')}
                 </p>
               </div>
               <Link to="/" className="btn btn-primary btn-block" style={{ textDecoration: 'none', display: 'block' }}>
-                Ir al dashboard
+                {t('join.goToDash')}
               </Link>
             </>
           )}

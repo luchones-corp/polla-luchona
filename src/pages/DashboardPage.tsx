@@ -1,9 +1,11 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import {
   createGroup,
   getFixtures,
   getGroupMembers,
+  getGroupReactions,
   getGroupsForUser,
   getGroupPredictions,
   getStandings,
@@ -17,16 +19,20 @@ import { rankStandings } from '../lib/ranking'
 import { Avatar } from '../components/Avatar'
 import { AchievementsPanel } from '../components/AchievementsPanel'
 import { ICONS } from '../components/Icons'
+import { LiveFeedView } from '../components/LiveFeedView'
 import { PartidosView } from '../components/PartidosView'
 import { TablaView } from '../components/TablaView'
 import { GrupoView } from '../components/GrupoView'
 import { useNotificationBadge } from '../hooks/useNotifications'
+import { usePushSubscription } from '../hooks/usePushSubscription'
+import { useSound } from '../hooks/useSound'
 import { useTheme } from '../hooks/useTheme'
 import { usePWAInstall } from '../hooks/usePWAInstall'
-import type { Fixture, Group, GroupMember, GroupPrediction, MatchPick, Prediction, Standing } from '../lib/types'
+import { useLocale } from '../contexts/LocaleContext'
+import type { Fixture, Group, GroupMember, GroupPrediction, MatchPick, Prediction, ReactionSummary, Standing } from '../lib/types'
 
 type DashboardPageProps = { session: Session; displayName: string }
-type View = 'partidos' | 'tabla' | 'grupo'
+type View = 'partidos' | 'tabla' | 'grupo' | 'en-vivo'
 
 export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const [view, setView] = useState<View>('partidos')
@@ -37,6 +43,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const [members, setMembers] = useState<GroupMember[]>([])
   const [standings, setStandings] = useState<Standing[]>([])
   const [groupPredictions, setGroupPredictions] = useState<GroupPrediction[]>([])
+  const [reactionsByMatch, setReactionsByMatch] = useState<Record<number, ReactionSummary[]>>({})
   const [newGroupName, setNewGroupName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -57,6 +64,11 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const badgeCount = useNotificationBadge(fixtures, predictionsByMatch)
   const { theme, toggleTheme } = useTheme()
   const { canInstall, promptInstall } = usePWAInstall()
+  const { isSubscribed, isSupported: pushSupported, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushSubscription(session.user.id)
+  const { play, muted, toggleMute } = useSound()
+  const { locale, setLocale, t } = useLocale()
+  const navigate = useNavigate()
+  const hasLive = fixtures.some(f => f.status === 'live')
 
   function showToast(msg: string) {
     setToast(msg)
@@ -80,7 +92,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
         ? selectedGroupId : nextGroups[0]?.id ?? null
       setSelectedGroupId(fallbackGroupId)
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'No se pudo cargar el dashboard')
+      setError(caughtError instanceof Error ? caughtError.message : t('dash.loadError'))
     } finally {
       setLoading(false)
     }
@@ -93,23 +105,25 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   }, [session.user.id])
 
   useEffect(() => {
-    if (!selectedGroupId) { setMembers([]); setStandings([]); setGroupPredictions([]); return }
+    if (!selectedGroupId) { setMembers([]); setStandings([]); setGroupPredictions([]); setReactionsByMatch({}); return }
     const groupId = selectedGroupId
     let mounted = true
     async function loadGroupData() {
       try {
-        const [nextMembers, nextStandings, nextGroupPredictions] = await Promise.all([
+        const [nextMembers, nextStandings, nextGroupPredictions, nextReactions] = await Promise.all([
           getGroupMembers(groupId),
           getStandings(groupId),
           getGroupPredictions(groupId),
+          getGroupReactions(groupId),
         ])
         if (!mounted) return
         setMembers(nextMembers)
         setStandings(nextStandings)
         setGroupPredictions(nextGroupPredictions)
+        setReactionsByMatch(nextReactions)
       } catch (caughtError) {
         if (!mounted) return
-        setError(caughtError instanceof Error ? caughtError.message : 'No se pudo cargar el grupo')
+        setError(caughtError instanceof Error ? caughtError.message : t('dash.groupError'))
       }
     }
     void loadGroupData()
@@ -126,27 +140,81 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       setNewGroupName('')
       await reloadBaseData()
       setSelectedGroupId(created.id)
-      showToast('¡Grupo creado!')
+      showToast(t('dash.groupCreated'))
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'No se pudo crear el grupo')
+      setError(caughtError instanceof Error ? caughtError.message : t('dash.createError'))
     }
   }
 
   async function handlePick(matchId: number, pick: MatchPick) {
     setError(null)
     try {
-      await savePrediction(session.user.id, matchId, pick)
+      const existing = predictionsByMatch[matchId]
+      await savePrediction(session.user.id, matchId, pick, existing?.score_home ?? null, existing?.score_away ?? null)
       setPredictionsByMatch(current => ({
         ...current,
-        [matchId]: { id: current[matchId]?.id ?? `local-${matchId}`, match_id: matchId, pick, updated_at: new Date().toISOString() },
+        [matchId]: {
+          id: current[matchId]?.id ?? `local-${matchId}`,
+          match_id: matchId,
+          pick,
+          score_home: current[matchId]?.score_home ?? null,
+          score_away: current[matchId]?.score_away ?? null,
+          updated_at: new Date().toISOString(),
+        },
       }))
-      showToast('¡Predicción guardada!')
+      play('whistle')
+      showToast(t('dash.predSaved'))
       if (selectedGroupId) {
         const refreshedStandings = await getStandings(selectedGroupId)
         setStandings(refreshedStandings)
       }
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'No se pudo guardar tu predicción')
+      setError(caughtError instanceof Error ? caughtError.message : t('dash.predError'))
+    }
+  }
+
+  async function handleScoreChange(matchId: number, scoreHome: number | null, scoreAway: number | null) {
+    const existing = predictionsByMatch[matchId]
+    const pick = scoreHome !== null && scoreAway !== null
+      ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
+      : existing?.pick
+    if (!pick) {
+      setPredictionsByMatch(current => ({
+        ...current,
+        [matchId]: {
+          id: current[matchId]?.id ?? `local-${matchId}`,
+          match_id: matchId,
+          pick: current[matchId]?.pick ?? 'HOME',
+          score_home: scoreHome,
+          score_away: scoreAway,
+          updated_at: new Date().toISOString(),
+        },
+      }))
+      return
+    }
+    setError(null)
+    try {
+      await savePrediction(session.user.id, matchId, pick, scoreHome, scoreAway)
+      setPredictionsByMatch(current => ({
+        ...current,
+        [matchId]: {
+          id: current[matchId]?.id ?? `local-${matchId}`,
+          match_id: matchId,
+          pick,
+          score_home: scoreHome,
+          score_away: scoreAway,
+          updated_at: new Date().toISOString(),
+        },
+      }))
+      if (scoreHome !== null && scoreAway !== null) {
+        showToast(t('dash.scoreSaved'))
+      }
+      if (selectedGroupId) {
+        const refreshedStandings = await getStandings(selectedGroupId)
+        setStandings(refreshedStandings)
+      }
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : t('dash.predError'))
     }
   }
 
@@ -156,9 +224,9 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     try {
       await regenerateInvite(selectedGroup.id)
       await reloadBaseData()
-      showToast('Enlace regenerado')
+      showToast(t('dash.inviteRegen'))
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'No se pudo regenerar el enlace')
+      setError(caughtError instanceof Error ? caughtError.message : t('dash.regenError'))
     }
   }
 
@@ -172,7 +240,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       const nextStandings = await getStandings(selectedGroup.id)
       setStandings(nextStandings)
     } catch (caughtError) {
-      setError(caughtError instanceof Error ? caughtError.message : 'No se pudo remover al miembro')
+      setError(caughtError instanceof Error ? caughtError.message : t('dash.removeError'))
     }
   }
 
@@ -185,16 +253,16 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
           <div className="card fade-in" style={{ padding: 28, width: 'min(420px, 95vw)' }}>
             <div className="brand" style={{ marginBottom: 16 }}>
               <div className="brand-mark"><span>LP</span></div>
-              <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+              <div className="brand-txt"><b>{t('brand.name')}</b><em>{t('brand.subtitle')}</em></div>
             </div>
-            <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 24, textTransform: 'uppercase', marginBottom: 8 }}>Crea tu grupo</h2>
-            <p style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 16 }}>Empieza creando un grupo para invitar a tus amigos.</p>
+            <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 24, textTransform: 'uppercase', marginBottom: 8 }}>{t('dash.createGroup')}</h2>
+            <p style={{ color: 'var(--ink-2)', fontSize: 14, marginBottom: 16 }}>{t('dash.createGroupDesc')}</p>
             <form onSubmit={handleCreateGroup}>
               <div className="field">
-                <label>Nombre del grupo</label>
-                <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder="ej. Polla Luchona" required />
+                <label>{t('dash.groupNameLabel')}</label>
+                <input value={newGroupName} onChange={e => setNewGroupName(e.target.value)} placeholder={t('dash.groupNamePlaceholder')} required />
               </div>
-              <button className="btn btn-primary btn-block" type="submit" style={{ marginTop: 8 }}>Crear grupo</button>
+              <button className="btn btn-primary btn-block" type="submit" style={{ marginTop: 8 }}>{t('dash.createBtn')}</button>
             </form>
             {error && <p className="error-msg" style={{ marginTop: 12 }}>{error}</p>}
           </div>
@@ -209,23 +277,62 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
         <div className="topbar-in">
           <div className="brand">
             <div className="brand-mark"><span>LP</span></div>
-            <div className="brand-txt"><b>La Polla</b><em>{selectedGroup?.name ?? 'Mundial 2026'}</em></div>
+            <div className="brand-txt"><b>{t('brand.name')}</b><em>{selectedGroup?.name ?? t('brand.subtitle')}</em></div>
           </div>
           <nav className="nav-desk">
             <button className={view === 'partidos' ? 'on' : ''} onClick={() => go('partidos')}>
-              {ICONS.dash} Partidos
+              {ICONS.dash} {t('nav.partidos')}
               {badgeCount > 0 && <span className="nav-badge">{badgeCount}</span>}
             </button>
-            <button className={view === 'tabla' ? 'on' : ''} onClick={() => go('tabla')}>{ICONS.board} Tabla</button>
-            <button className={view === 'grupo' ? 'on' : ''} onClick={() => go('grupo')}>{ICONS.group} Grupo</button>
+            <button className={view === 'tabla' ? 'on' : ''} onClick={() => go('tabla')}>{ICONS.board} {t('nav.tabla')}</button>
+            <button className={view === 'grupo' ? 'on' : ''} onClick={() => go('grupo')}>{ICONS.group} {t('nav.grupo')}</button>
+            <button className={view === 'en-vivo' ? 'on' : ''} onClick={() => go('en-vivo')} style={{ position: 'relative' }}>
+              {ICONS.dash} {t('nav.envivo')}
+              {hasLive && <span className="live-dot-nav" />}
+            </button>
           </nav>
           <div className="topbar-right">
-            <button className="btn btn-ghost btn-sm" onClick={() => setShowAchievements(true)} title="Logros">
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setLocale(locale === 'es' ? 'en' : 'es')}
+              title={locale === 'es' ? 'English' : 'Español'}
+              style={{ fontFamily: 'var(--font-head)', fontWeight: 800, fontSize: 12, letterSpacing: '.04em' }}
+            >
+              {locale === 'es' ? 'EN' : 'ES'}
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={toggleMute} title={muted ? t('dash.soundOn') : t('dash.soundOff')}>
+              {muted ? (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                  <line x1="23" y1="9" x2="17" y2="15" strokeLinecap="round" />
+                  <line x1="17" y1="9" x2="23" y2="15" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+            </button>
+            {pushSupported && (
+              <button
+                className="btn btn-ghost btn-sm"
+                onClick={() => void (isSubscribed ? pushUnsubscribe() : pushSubscribe())}
+                title={isSubscribed ? t('dash.notifOff') : t('dash.notifOn')}
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {isSubscribed && <span className="bell-active-dot" />}
+              </button>
+            )}
+            <button className="btn btn-ghost btn-sm" onClick={() => setShowAchievements(true)} title={t('dash.achievements')}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M8 21h8M12 17v4M5 4h14v6a7 7 0 0 1-14 0zM5 7H3v1a3 3 0 0 0 3 3M19 7h2v1a3 3 0 0 1-3 3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={toggleTheme} title={theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}>
+            <button className="btn btn-ghost btn-sm" onClick={toggleTheme} title={theme === 'dark' ? t('dash.lightMode') : t('dash.darkMode')}>
               {theme === 'dark' ? (
                 <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
                   <circle cx="12" cy="12" r="5" /><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" strokeLinecap="round" />
@@ -236,11 +343,11 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
                 </svg>
               )}
             </button>
-            <div className="me-chip">
+            <div className="me-chip" style={{ cursor: 'pointer' }} onClick={() => navigate(`/profile/${session.user.id}`)}>
               <span className="me-name">{displayName}</span>
               <Avatar name={displayName} size={30} />
             </div>
-            <button className="btn btn-ghost btn-sm" onClick={() => void signOut()} title="Cerrar sesión">
+            <button className="btn btn-ghost btn-sm" onClick={() => void signOut()} title={t('dash.logout')}>
               {ICONS.logout}
             </button>
           </div>
@@ -249,19 +356,23 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
 
       <nav className="nav-mob">
         <button className={view === 'partidos' ? 'on' : ''} onClick={() => go('partidos')} style={{ position: 'relative' }}>
-          {ICONS.dash}<span>Partidos</span>
+          {ICONS.dash}<span>{t('nav.partidos')}</span>
           {badgeCount > 0 && <span className="nav-badge">{badgeCount}</span>}
         </button>
-        <button className={view === 'tabla' ? 'on' : ''} onClick={() => go('tabla')}>{ICONS.board}<span>Tabla</span></button>
-        <button className={view === 'grupo' ? 'on' : ''} onClick={() => go('grupo')}>{ICONS.group}<span>Grupo</span></button>
+        <button className={view === 'tabla' ? 'on' : ''} onClick={() => go('tabla')}>{ICONS.board}<span>{t('nav.tabla')}</span></button>
+        <button className={view === 'grupo' ? 'on' : ''} onClick={() => go('grupo')}>{ICONS.group}<span>{t('nav.grupo')}</span></button>
+        <button className={view === 'en-vivo' ? 'on' : ''} onClick={() => go('en-vivo')} style={{ position: 'relative' }}>
+          {ICONS.dash}<span>{t('nav.vivoShort')}</span>
+          {hasLive && <span className="live-dot-nav" />}
+        </button>
       </nav>
 
       <main className="page page-mob-pad">
         {canInstall && (
           <div className="wrap" style={{ marginBottom: 12 }}>
             <div className="pwa-banner card">
-              <span>Instala La Polla en tu dispositivo para acceso rápido.</span>
-              <button className="btn btn-primary btn-sm" onClick={promptInstall}>Instalar</button>
+              <span>{t('dash.pwaBanner')}</span>
+              <button className="btn btn-primary btn-sm" onClick={promptInstall}>{t('dash.install')}</button>
             </div>
           </div>
         )}
@@ -273,6 +384,11 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             predictionsByMatch={predictionsByMatch}
             groupPredictionsByMatch={groupPredictionsByMatch}
             onPick={handlePick}
+            onScoreChange={handleScoreChange}
+            groupId={selectedGroupId ?? undefined}
+            userId={session.user.id}
+            reactionsByMatch={reactionsByMatch}
+            lockMinutesBefore={selectedGroup?.lock_minutes_before ?? 0}
           />
         )}
 
@@ -284,7 +400,12 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             groupPredictions={groupPredictions}
             predictionsByMatch={predictionsByMatch}
             groupId={selectedGroupId}
+            groupName={selectedGroup?.name ?? 'Mundial 2026'}
           />
+        )}
+
+        {view === 'en-vivo' && (
+          <LiveFeedView fixtures={fixtures} />
         )}
 
         {view === 'grupo' && (
@@ -296,6 +417,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             onRegenerateInvite={handleRegenerateInvite}
             onRemoveMember={handleRemoveMember}
             toast={showToast}
+            onGroupUpdated={() => void reloadBaseData()}
           />
         )}
       </main>

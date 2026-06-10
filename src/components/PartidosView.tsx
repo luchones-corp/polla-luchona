@@ -1,46 +1,51 @@
 import { useMemo, useState } from 'react'
 import { isBeforeKickoff, isToday, isTomorrow } from '../lib/date'
+import { useLocale } from '../contexts/LocaleContext'
 import { FixtureCard } from './FixtureCard'
 import { PredictAllFlow } from './PredictAllFlow'
-import type { Fixture, GroupPrediction, MatchPick, Prediction } from '../lib/types'
+import type { Fixture, GroupPrediction, MatchPick, Prediction, ReactionSummary } from '../lib/types'
 
 type StageFilter = 'todos' | 'group' | 'r32' | 'r16' | 'qf' | 'sf' | 'final'
 type DateFilter = 'todos' | 'hoy' | 'mañana'
 type StatusFilter = 'todos' | 'pendiente' | 'predicho'
 
-const STAGE_OPTIONS: { value: StageFilter; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'group', label: 'Grupos' },
-  { value: 'r32', label: 'R32' },
-  { value: 'r16', label: 'R16' },
-  { value: 'qf', label: 'Cuartos' },
-  { value: 'sf', label: 'Semis' },
-  { value: 'final', label: 'Final' },
-]
-
-const DATE_OPTIONS: { value: DateFilter; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'hoy', label: 'Hoy' },
-  { value: 'mañana', label: 'Mañana' },
-]
-
-const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
-  { value: 'todos', label: 'Todos' },
-  { value: 'pendiente', label: 'Sin predicción' },
-  { value: 'predicho', label: 'Ya predicho' },
-]
-
-export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByMatch, onPick }: {
+export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByMatch, onPick, onScoreChange, groupId, userId, reactionsByMatch, lockMinutesBefore = 0 }: {
   fixtures: Fixture[]
   predictionsByMatch: Record<number, Prediction>
   groupPredictionsByMatch: Record<number, GroupPrediction[]>
   onPick: (matchId: number, pick: MatchPick) => void
+  onScoreChange: (matchId: number, home: number | null, away: number | null) => void
+  groupId?: string
+  userId?: string
+  reactionsByMatch?: Record<number, ReactionSummary[]>
+  lockMinutesBefore?: number
 }) {
+  const { t } = useLocale()
   const [page, setPage] = useState(0)
   const [showPredictAll, setShowPredictAll] = useState(false)
   const [stageFilter, setStageFilter] = useState<StageFilter>('todos')
   const [dateFilter, setDateFilter] = useState<DateFilter>('todos')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos')
+
+  const stageOptions: { value: StageFilter; label: string }[] = [
+    { value: 'todos', label: t('partidos.all') },
+    { value: 'group', label: t('partidos.groups') },
+    { value: 'r32', label: 'R32' },
+    { value: 'r16', label: 'R16' },
+    { value: 'qf', label: t('partidos.qf') },
+    { value: 'sf', label: t('partidos.sf') },
+    { value: 'final', label: t('partidos.final') },
+  ]
+  const dateOptions: { value: DateFilter; label: string }[] = [
+    { value: 'todos', label: t('partidos.all') },
+    { value: 'hoy', label: t('partidos.today') },
+    { value: 'mañana', label: t('partidos.tomorrow') },
+  ]
+  const statusOptions: { value: StatusFilter; label: string }[] = [
+    { value: 'todos', label: t('partidos.all') },
+    { value: 'pendiente', label: t('partidos.unpredicted') },
+    { value: 'predicho', label: t('partidos.predicted') },
+  ]
 
   const filtered = useMemo(() => {
     return fixtures.filter(f => {
@@ -67,12 +72,12 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
   return (
     <div className="wrap fade-in">
       <div className="sec-head">
-        <h2>Partidos</h2>
+        <h2>{t('partidos.heading')}</h2>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {pending > 0 && <span className="chip chip-gold">{pending} sin predicción</span>}
+          {pending > 0 && <span className="chip chip-gold">{pending} {t('partidos.noPrediction')}</span>}
           {pending > 0 && (
             <button className="btn btn-primary btn-sm" onClick={() => setShowPredictAll(true)}>
-              Predecir todos
+              {t('partidos.predictAll')}
             </button>
           )}
         </div>
@@ -80,17 +85,17 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
 
       <div className="filter-bar">
         <div className="filter-group">
-          {STAGE_OPTIONS.map(o => (
+          {stageOptions.map(o => (
             <button key={o.value} className={'chip' + (stageFilter === o.value ? ' chip-lime' : '')} onClick={() => changeFilter(setStageFilter, o.value)}>{o.label}</button>
           ))}
         </div>
         <div className="filter-group">
-          {DATE_OPTIONS.map(o => (
+          {dateOptions.map(o => (
             <button key={o.value} className={'chip' + (dateFilter === o.value ? ' chip-lime' : '')} onClick={() => changeFilter(setDateFilter, o.value)}>{o.label}</button>
           ))}
         </div>
         <div className="filter-group">
-          {STATUS_OPTIONS.map(o => (
+          {statusOptions.map(o => (
             <button key={o.value} className={'chip' + (statusFilter === o.value ? ' chip-lime' : '')} onClick={() => changeFilter(setStatusFilter, o.value)}>{o.label}</button>
           ))}
         </div>
@@ -99,18 +104,18 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
       <div className="fx-list">
         {paged.length === 0 && (
           <div className="card" style={{ padding: 24, textAlign: 'center' }}>
-            <p style={{ color: 'var(--ink-2)' }}>No hay partidos con estos filtros.</p>
+            <p style={{ color: 'var(--ink-2)' }}>{t('partidos.noMatches')}</p>
           </div>
         )}
         {paged.map(f => (
-          <FixtureCard key={f.id} fixture={f} currentPick={predictionsByMatch[f.id]?.pick} groupPicks={groupPredictionsByMatch[f.id]} onPick={onPick} />
+          <FixtureCard key={f.id} fixture={f} prediction={predictionsByMatch[f.id]} groupPicks={groupPredictionsByMatch[f.id]} onPick={onPick} onScoreChange={onScoreChange} groupId={groupId} userId={userId} reactions={reactionsByMatch?.[f.id]} lockMinutesBefore={lockMinutesBefore} />
         ))}
       </div>
       {totalPages > 1 && (
         <div className="pagination-row">
-          <button className="btn btn-ghost btn-sm" disabled={safePage === 0} onClick={() => setPage(p => p - 1)}>← Anterior</button>
+          <button className="btn btn-ghost btn-sm" disabled={safePage === 0} onClick={() => setPage(p => p - 1)}>{t('partidos.prev')}</button>
           <span>{safePage + 1} / {totalPages}</span>
-          <button className="btn btn-ghost btn-sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Siguiente →</button>
+          <button className="btn btn-ghost btn-sm" disabled={safePage >= totalPages - 1} onClick={() => setPage(p => p + 1)}>{t('partidos.next')}</button>
         </div>
       )}
 
@@ -119,6 +124,7 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
           fixtures={fixtures}
           predictionsByMatch={predictionsByMatch}
           onPick={onPick}
+          onScoreChange={onScoreChange}
           onClose={() => setShowPredictAll(false)}
         />
       )}

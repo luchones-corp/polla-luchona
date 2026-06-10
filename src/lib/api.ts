@@ -1,6 +1,6 @@
 import type { User } from '@supabase/supabase-js'
 import { supabase } from './supabase'
-import type { Fixture, Group, GroupMember, GroupPrediction, MatchPick, Prediction, Standing } from './types'
+import type { Fixture, Group, GroupArchive, GroupMember, GroupPrediction, LeaderboardSnapshot, MatchEvent, MatchPick, Prediction, ReactionSummary, Standing } from './types'
 
 export async function getProfileDisplayName(userId: string): Promise<string | null> {
   const { data, error } = await supabase
@@ -42,7 +42,7 @@ export async function createGroup(name: string): Promise<Group> {
 export async function getGroupsForUser(user: User): Promise<Group[]> {
   const { data, error } = await supabase
     .from('group_members')
-    .select('groups!inner(id, name, owner_id, invite_token)')
+    .select('groups!inner(id, name, owner_id, invite_token, lock_minutes_before)')
     .eq('user_id', user.id)
 
   if (error) throw error
@@ -119,17 +119,29 @@ export async function getFixtures(): Promise<Fixture[]> {
 export async function getUserPredictions(userId: string): Promise<Prediction[]> {
   const { data, error } = await supabase
     .from('predictions')
-    .select('id, match_id, pick, updated_at')
+    .select('id, match_id, pick, score_home, score_away, updated_at')
     .eq('user_id', userId)
 
   if (error) throw error
   return (data ?? []) as Prediction[]
 }
 
-export async function savePrediction(userId: string, matchId: number, pick: MatchPick): Promise<void> {
+export async function savePrediction(
+  userId: string,
+  matchId: number,
+  pick: MatchPick,
+  scoreHome: number | null = null,
+  scoreAway: number | null = null,
+): Promise<void> {
+  const derivedPick = scoreHome !== null && scoreAway !== null
+    ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
+    : pick
   const { error } = await supabase
     .from('predictions')
-    .upsert({ user_id: userId, match_id: matchId, pick }, { onConflict: 'user_id,match_id' })
+    .upsert(
+      { user_id: userId, match_id: matchId, pick: derivedPick, score_home: scoreHome, score_away: scoreAway },
+      { onConflict: 'user_id,match_id' },
+    )
 
   if (error) throw error
 }
@@ -143,7 +155,7 @@ export async function getGroupPredictions(groupId: string): Promise<GroupPredict
 export async function getStandings(groupId: string): Promise<Standing[]> {
   const { data, error } = await supabase
     .from('group_standings')
-    .select('group_id, user_id, display_name, points')
+    .select('group_id, user_id, display_name, points, exact_count, last_correct_at')
     .eq('group_id', groupId)
 
   if (error) throw error
@@ -185,6 +197,39 @@ export async function sendGroupMessage(groupId: string, userId: string, body: st
   if (error) throw error
 }
 
+export async function getUserProfile(userId: string): Promise<{ display_name: string | null; created_at: string }> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('display_name, created_at')
+    .eq('id', userId)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function getPublicUserPredictions(userId: string, groupId: string): Promise<Prediction[]> {
+  const { data, error } = await supabase.rpc('get_user_predictions_in_group', {
+    target_user_id: userId,
+    target_group_id: groupId,
+  })
+  if (error) throw error
+  return (data ?? []).map((row: any) => ({
+    id: `public-${row.match_id}`,
+    match_id: row.match_id,
+    pick: row.pick,
+    score_home: row.score_home,
+    score_away: row.score_away,
+    updated_at: row.updated_at,
+  }))
+}
+
+export async function getLeaderboardHistory(groupId: string): Promise<LeaderboardSnapshot[]> {
+  const { data, error } = await supabase.rpc('get_leaderboard_history', { target_group_id: groupId })
+  if (error) throw error
+  return (data ?? []) as LeaderboardSnapshot[]
+}
+
 export async function getStageStandings(groupId: string, stage?: string): Promise<Standing[]> {
   const { data, error } = await supabase.rpc('get_stage_standings', {
     target_group_id: groupId,
@@ -192,4 +237,111 @@ export async function getStageStandings(groupId: string, stage?: string): Promis
   })
   if (error) throw error
   return (data ?? []) as Standing[]
+}
+
+export async function savePushSubscription(
+  userId: string,
+  subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
+): Promise<void> {
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .upsert(
+      { user_id: userId, endpoint: subscription.endpoint, p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+      { onConflict: 'user_id,endpoint' },
+    )
+  if (error) throw error
+}
+
+export async function deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+  const { error } = await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('user_id', userId)
+    .eq('endpoint', endpoint)
+  if (error) throw error
+}
+
+export async function getTodayMatchEvents(): Promise<MatchEvent[]> {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(tomorrow.getDate() + 1)
+
+  const { data, error } = await supabase
+    .from('match_events')
+    .select('id, match_id, event_type, minute, description, created_at')
+    .gte('created_at', today.toISOString())
+    .lt('created_at', tomorrow.toISOString())
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (error) throw error
+  return (data ?? []) as MatchEvent[]
+}
+
+export async function addGhostPlayer(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('add_ghost_player', { target_group_id: groupId })
+  if (error) throw error
+}
+
+export async function getGroupArchive(groupId: string, season = '2026'): Promise<GroupArchive | null> {
+  const { data, error } = await supabase
+    .from('group_archives')
+    .select('*')
+    .eq('group_id', groupId)
+    .eq('season', season)
+    .maybeSingle()
+  if (error) throw error
+  return data as GroupArchive | null
+}
+
+export async function createGroupArchive(groupId: string): Promise<void> {
+  const { error } = await supabase.rpc('archive_group', { target_group_id: groupId })
+  if (error) throw error
+}
+
+export async function updateGroupLockMinutes(groupId: string, lockMinutesBefore: number): Promise<void> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ lock_minutes_before: lockMinutesBefore })
+    .eq('id', groupId)
+  if (error) throw error
+}
+
+export async function getGroupReactions(groupId: string): Promise<Record<number, ReactionSummary[]>> {
+  const { data, error } = await supabase.rpc('get_group_reactions', { target_group_id: groupId })
+  if (error) throw error
+  const map: Record<number, ReactionSummary[]> = {}
+  for (const row of (data ?? []) as ReactionSummary[]) {
+    if (!map[row.match_id]) map[row.match_id] = []
+    map[row.match_id].push(row)
+  }
+  return map
+}
+
+export async function toggleReaction(matchId: number, groupId: string, userId: string, emoji: string): Promise<boolean> {
+  // Check if reaction exists
+  const { data: existing } = await supabase
+    .from('match_reactions')
+    .select('id')
+    .eq('match_id', matchId)
+    .eq('group_id', groupId)
+    .eq('user_id', userId)
+    .eq('emoji', emoji)
+    .maybeSingle()
+
+  if (existing) {
+    const { error } = await supabase
+      .from('match_reactions')
+      .delete()
+      .eq('id', existing.id)
+    if (error) throw error
+    return false // removed
+  } else {
+    const { error } = await supabase
+      .from('match_reactions')
+      .insert({ match_id: matchId, group_id: groupId, user_id: userId, emoji })
+    if (error) throw error
+    return true // added
+  }
 }

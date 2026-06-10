@@ -13,6 +13,11 @@ export function isBeforeKickoff(iso: string): boolean {
   return new Date(iso).getTime() > Date.now()
 }
 
+export function isBeforeLockTime(kickoffIso: string, lockMinutesBefore = 0): boolean {
+  const lockTime = new Date(kickoffIso).getTime() - lockMinutesBefore * 60_000
+  return lockTime > Date.now()
+}
+
 export function isToday(iso: string): boolean {
   const d = new Date(iso)
   const now = new Date()

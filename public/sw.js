@@ -23,3 +23,23 @@ self.addEventListener('fetch', (e) => {
     caches.match(e.request).then(r => r || fetch(e.request))
   )
 })
+
+// Push notifications
+self.addEventListener('push', (e) => {
+  const data = e.data ? e.data.json() : {}
+  const title = data.title || 'La Polla'
+  const options = {
+    body: data.body || '',
+    icon: '/icons/icon-192.svg',
+    badge: '/icons/icon-192.svg',
+    data: { url: data.url || '/' },
+    tag: data.tag || 'default',
+  }
+  e.waitUntil(self.registration.showNotification(title, options))
+})
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const url = e.notification.data?.url || '/'
+  e.waitUntil(clients.openWindow(url))
+})

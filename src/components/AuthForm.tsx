@@ -1,5 +1,6 @@
 import { FormEvent, useState } from 'react'
 import { signIn, signUp } from '../lib/api'
+import { useLocale } from '../contexts/LocaleContext'
 
 type AuthFormProps = {
   onDone: () => void
@@ -8,6 +9,7 @@ type AuthFormProps = {
 const FLAG_CODES = ['mx','br','ar','fr','de','es','us','jp','ma','nl','pt','kr','ca','au','gb-sct','cw']
 
 export function AuthForm({ onDone }: AuthFormProps) {
+  const { t } = useLocale()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,14 +27,14 @@ export function AuthForm({ onDone }: AuthFormProps) {
       if (mode === 'signup') {
         const { error: signUpError } = await signUp(email, password)
         if (signUpError) throw signUpError
-        setMessage('Cuenta creada. Revisa tu correo para confirmar si tu proyecto lo requiere.')
+        setMessage(t('auth.signupSuccess'))
       } else {
         const { error: signInError } = await signIn(email, password)
         if (signInError) throw signInError
         onDone()
       }
     } catch (caughtError) {
-      const nextMessage = caughtError instanceof Error ? caughtError.message : 'Error de autenticación'
+      const nextMessage = caughtError instanceof Error ? caughtError.message : t('auth.error')
       setError(nextMessage)
     } finally {
       setLoading(false)
@@ -44,11 +46,11 @@ export function AuthForm({ onDone }: AuthFormProps) {
       <div className="auth-art">
         <div className="brand">
           <div className="brand-mark"><span>LP</span></div>
-          <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+          <div className="brand-txt"><b>{t('brand.name')}</b><em>{t('brand.subtitle')}</em></div>
         </div>
         <div>
-          <div className="big-word">PREDICE.<br />COMPITE.<br /><span className="hl">GANA.</span></div>
-          <p className="tagline">Arma tu polla del Mundial, invita a tus amigos y demuestra quién sabe más de fútbol.</p>
+          <div className="big-word">{t('auth.tagline1')}<br />{t('auth.tagline2')}<br /><span className="hl">{t('auth.tagline3')}</span></div>
+          <p className="tagline">{t('auth.description')}</p>
         </div>
         <div>
           <div className="flag-strip" style={{ marginBottom: 26 }}>
@@ -57,8 +59,8 @@ export function AuthForm({ onDone }: AuthFormProps) {
             ))}
           </div>
           <div className="art-foot">
-            <div className="art-stat"><b>48</b><em>Selecciones</em></div>
-            <div className="art-stat"><b>104</b><em>Partidos</em></div>
+            <div className="art-stat"><b>48</b><em>{t('auth.statTeams')}</em></div>
+            <div className="art-stat"><b>104</b><em>{t('auth.statMatches')}</em></div>
           </div>
         </div>
       </div>
@@ -67,38 +69,36 @@ export function AuthForm({ onDone }: AuthFormProps) {
         <div className="auth-box fade-in">
           <div className="brand" style={{ marginBottom: 26 }}>
             <div className="brand-mark"><span>LP</span></div>
-            <div className="brand-txt"><b>La Polla</b><em>Mundial 2026</em></div>
+            <div className="brand-txt"><b>{t('brand.name')}</b><em>{t('brand.subtitle')}</em></div>
           </div>
 
           <div className="seg-tabs">
             <button className={mode === 'signin' ? 'on' : ''} onClick={() => { setMode('signin'); setError(null); setMessage(null) }}>
-              Iniciar sesión
+              {t('auth.signinTab')}
             </button>
             <button className={mode === 'signup' ? 'on' : ''} onClick={() => { setMode('signup'); setError(null); setMessage(null) }}>
-              Crear cuenta
+              {t('auth.signupTab')}
             </button>
           </div>
 
-          <h1>{mode === 'signin' ? 'Bienvenido de vuelta' : 'Únete al juego'}</h1>
+          <h1>{mode === 'signin' ? t('auth.signinHeading') : t('auth.signupHeading')}</h1>
           <p className="lead">
-            {mode === 'signin'
-              ? 'Entra para hacer tus predicciones de la jornada.'
-              : 'Crea tu cuenta y empieza a predecir en segundos.'}
+            {mode === 'signin' ? t('auth.signinDesc') : t('auth.signupDesc')}
           </p>
 
           <form onSubmit={handleSubmit}>
             <div className="field">
-              <label>Correo</label>
+              <label>{t('auth.emailLabel')}</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@correo.com"
+                placeholder={t('auth.emailPlaceholder')}
               />
             </div>
             <div className="field">
-              <label>Contraseña</label>
+              <label>{t('auth.passwordLabel')}</label>
               <input
                 type="password"
                 required
@@ -110,7 +110,7 @@ export function AuthForm({ onDone }: AuthFormProps) {
             </div>
 
             <button className="btn btn-primary btn-block" type="submit" disabled={loading} style={{ marginTop: 8 }}>
-              {loading ? 'Cargando...' : mode === 'signin' ? 'Entrar' : 'Crear cuenta'}
+              {loading ? t('auth.loading') : mode === 'signin' ? t('auth.signinBtn') : t('auth.signupBtn')}
             </button>
           </form>
 

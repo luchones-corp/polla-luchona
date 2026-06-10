@@ -1,10 +1,14 @@
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { Avatar } from './Avatar'
 import { GroupChat } from './GroupChat'
 import { ICONS } from './Icons'
+import { addGhostPlayer, createGroupArchive, updateGroupLockMinutes } from '../lib/api'
+import { useLocale } from '../contexts/LocaleContext'
 import type { Group, GroupMember } from '../lib/types'
 
-export function GrupoView({ selectedGroup, isOwner, members, session, onRegenerateInvite, onRemoveMember, toast }: {
+export function GrupoView({ selectedGroup, isOwner, members, session, onRegenerateInvite, onRemoveMember, toast, onGroupUpdated }: {
   selectedGroup: Group | null
   isOwner: boolean
   members: GroupMember[]
@@ -12,13 +16,25 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
   onRegenerateInvite: () => void
   onRemoveMember: (id: string) => void
   toast: (msg: string) => void
+  onGroupUpdated?: () => void
 }) {
+  const { t } = useLocale()
+  const navigate = useNavigate()
+  const [archiving, setArchiving] = useState(false)
+
+  const lockOptions = [
+    { value: 0, label: t('grupo.lockAtStart') },
+    { value: 15, label: t('grupo.lock15') },
+    { value: 30, label: t('grupo.lock30') },
+    { value: 60, label: t('grupo.lock60') },
+  ]
+
   if (!selectedGroup) {
     return (
       <div className="wrap fade-in">
-        <div className="sec-head"><h2>Tu grupo</h2></div>
+        <div className="sec-head"><h2>{t('grupo.heading')}</h2></div>
         <div className="card" style={{ padding: 24 }}>
-          <p style={{ color: 'var(--ink-2)' }}>No perteneces a ningún grupo aún.</p>
+          <p style={{ color: 'var(--ink-2)' }}>{t('grupo.noGroup')}</p>
         </div>
       </div>
     )
@@ -30,10 +46,10 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
     <div className="wrap fade-in">
       <div className="sec-head">
         <div>
-          <p className="kicker" style={{ marginBottom: 6 }}>Administración</p>
-          <h2>Tu grupo</h2>
+          <p className="kicker" style={{ marginBottom: 6 }}>{t('grupo.admin')}</p>
+          <h2>{t('grupo.heading')}</h2>
         </div>
-        <span className="chip chip-lime">{members.length} jugadores</span>
+        <span className="chip chip-lime">{members.length} {t('tabla.players')}</span>
       </div>
 
       <div className="grp-grid">
@@ -44,21 +60,21 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
               color: '#0a0d10', display: 'grid', placeItems: 'center',
               fontFamily: 'var(--font-disp)', fontSize: 18, transform: 'skewX(-6deg)', flexShrink: 0,
             }}>
-              <span style={{ transform: 'skewX(6deg)' }}>🏆</span>
+              <span style={{ transform: 'skewX(6deg)' }}>{'\uD83C\uDFC6'}</span>
             </div>
             <div>
               <h3>{selectedGroup.name}</h3>
-              <div style={{ color: 'var(--ink-3)', fontSize: 12, fontWeight: 600 }}>Mundial 2026</div>
+              <div style={{ color: 'var(--ink-3)', fontSize: 12, fontWeight: 600 }}>{t('brand.subtitle')}</div>
             </div>
           </div>
-          <p>Comparte este enlace y cualquiera podrá unirse a competir en tu polla.</p>
+          <p>{t('grupo.shareDesc')}</p>
           <div className="share-row">
-            <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard.writeText(inviteLink); toast('¡Enlace copiado!') }}>
-              {ICONS.copy} Copiar enlace
+            <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard.writeText(inviteLink); toast(t('grupo.linkCopied')) }}>
+              {ICONS.copy} {t('grupo.copyLink')}
             </button>
             {isOwner && (
               <button className="btn btn-dark btn-sm" onClick={onRegenerateInvite}>
-                {ICONS.regen} Regenerar
+                {ICONS.regen} {t('grupo.regenerate')}
               </button>
             )}
           </div>
@@ -66,8 +82,8 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
 
         <div className="card" style={{ padding: '6px 18px 14px' }}>
           <div className="sec-head" style={{ margin: '16px 0 4px' }}>
-            <h2 style={{ fontSize: 20 }}>Miembros</h2>
-            <span className="sub">{members.length} jugadores</span>
+            <h2 style={{ fontSize: 20 }}>{t('grupo.members')}</h2>
+            <span className="sub">{members.length} {t('tabla.players')}</span>
           </div>
           <div className="member-list">
             {members.map(m => (
@@ -75,14 +91,14 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
                 <Avatar name={m.display_name ?? '?'} size={42} />
                 <div style={{ minWidth: 0 }}>
                   <div className="mn">
-                    {m.display_name ?? 'Sin nombre'}
-                    {m.user_id === selectedGroup.owner_id && <span className="admin-tag">Admin</span>}
-                    {m.user_id === session.user.id && <span className="you-tag">TÚ</span>}
+                    {m.display_name ?? t('common.noName')}
+                    {m.user_id === selectedGroup.owner_id && <span className="admin-tag">{t('grupo.adminTag')}</span>}
+                    {m.user_id === session.user.id && <span className="you-tag">{t('grupo.youTag')}</span>}
                   </div>
                 </div>
                 <div className="mright">
                   {isOwner && m.user_id !== session.user.id && (
-                    <button className="btn btn-danger btn-sm" onClick={() => onRemoveMember(m.user_id)}>Quitar</button>
+                    <button className="btn btn-danger btn-sm" onClick={() => onRemoveMember(m.user_id)}>{t('grupo.remove')}</button>
                   )}
                 </div>
               </div>
@@ -90,6 +106,76 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
           </div>
         </div>
       </div>
+
+      {isOwner && (
+        <div className="card group-settings" style={{ padding: '18px 20px', marginTop: 20 }}>
+          <h3 style={{ fontSize: 16, fontFamily: 'var(--font-head)', fontWeight: 800, marginBottom: 12 }}>{t('grupo.settings')}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <label style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>{t('grupo.lockLabel')}</label>
+            <select
+              value={selectedGroup.lock_minutes_before}
+              onChange={async (e) => {
+                const val = Number(e.target.value)
+                try {
+                  await updateGroupLockMinutes(selectedGroup.id, val)
+                  toast(t('grupo.settingsUpdated'))
+                  onGroupUpdated?.()
+                } catch {
+                  toast(t('grupo.settingsError'))
+                }
+              }}
+              style={{
+                padding: '6px 12px', borderRadius: 8, border: '1px solid var(--line-2)',
+                background: 'var(--surface-2)', color: 'var(--ink)', fontSize: 13,
+                fontFamily: 'var(--font-body)',
+              }}
+            >
+              {lockOptions.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
+            <button
+              className="btn btn-dark btn-sm"
+              onClick={async () => {
+                try {
+                  await addGhostPlayer(selectedGroup.id)
+                  toast(t('grupo.botAdded'))
+                  onGroupUpdated?.()
+                } catch {
+                  toast(t('grupo.botError'))
+                }
+              }}
+            >
+              {'\uD83C\uDFB2'} {t('grupo.addBot')}
+            </button>
+            <button
+              className="btn btn-dark btn-sm"
+              disabled={archiving}
+              onClick={async () => {
+                setArchiving(true)
+                try {
+                  await createGroupArchive(selectedGroup.id)
+                  toast(t('grupo.archived'))
+                } catch {
+                  toast(t('grupo.archiveError'))
+                } finally {
+                  setArchiving(false)
+                }
+              }}
+            >
+              {archiving ? t('grupo.archiving') : `\uD83D\uDCE6 ${t('grupo.archiveBtn')}`}
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => navigate(`/archive/${selectedGroup.id}`)}
+            >
+              {t('grupo.viewArchive')}
+            </button>
+          </div>
+        </div>
+      )}
 
       <GroupChat groupId={selectedGroup.id} userId={session.user.id} />
     </div>
