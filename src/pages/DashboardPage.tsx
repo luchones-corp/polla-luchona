@@ -327,13 +327,10 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             <div className="brand-mark"><span>LP</span></div>
             <div className="brand-txt">
               <b>{t('brand.name')}</b>
-              {groups.length <= 1
-                ? <em>{selectedGroup?.name ?? t('brand.subtitle')}</em>
-                : <button className="group-switcher" onClick={() => setShowGroupMenu(v => !v)}>
-                    {selectedGroup?.name ?? t('brand.subtitle')}
-                    <svg className={'group-switcher-chevron' + (showGroupMenu ? ' open' : '')} viewBox="0 0 12 7" width="10" height="6"><path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" /></svg>
-                  </button>
-              }
+              <button className="group-switcher" onClick={() => setShowGroupMenu(v => !v)}>
+                {selectedGroup?.name ?? t('brand.subtitle')}
+                <svg className={'group-switcher-chevron' + (showGroupMenu ? ' open' : '')} viewBox="0 0 12 7" width="10" height="6"><path d="M1 1l5 5 5-5" stroke="currentColor" strokeWidth="1.5" fill="none" /></svg>
+              </button>
             </div>
             {showGroupMenu && (
               <div className="group-menu">
