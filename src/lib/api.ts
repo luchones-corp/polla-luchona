@@ -45,9 +45,22 @@ export async function getGroupsForUser(user: User): Promise<Group[]> {
     .select('groups!inner(id, name, owner_id, invite_token, lock_minutes_before)')
     .eq('user_id', user.id)
 
-  if (error) throw error
+  if (!error) {
+    return (data ?? []).map((row: any) => row.groups as Group)
+  }
 
-  return (data ?? []).map((row: any) => row.groups as Group)
+  // Fallback: lock_minutes_before column may not exist yet (migration 010)
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('group_members')
+    .select('groups!inner(id, name, owner_id, invite_token)')
+    .eq('user_id', user.id)
+
+  if (fallbackError) throw fallbackError
+
+  return (fallback ?? []).map((row: any) => ({
+    ...row.groups,
+    lock_minutes_before: 0,
+  } as Group))
 }
 
 export async function getGroupByInviteToken(token: string): Promise<Pick<Group, 'id' | 'name' | 'owner_id'> | null> {
@@ -122,8 +135,22 @@ export async function getUserPredictions(userId: string): Promise<Prediction[]> 
     .select('id, match_id, pick, score_home, score_away, updated_at')
     .eq('user_id', userId)
 
-  if (error) throw error
-  return (data ?? []) as Prediction[]
+  if (!error) {
+    return (data ?? []) as Prediction[]
+  }
+
+  // Fallback: score columns may not exist yet (migration 005)
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('predictions')
+    .select('id, match_id, pick, updated_at')
+    .eq('user_id', userId)
+
+  if (fallbackError) throw fallbackError
+  return (fallback ?? []).map((row: any) => ({
+    ...row,
+    score_home: null,
+    score_away: null,
+  } as Prediction))
 }
 
 export async function savePrediction(
@@ -143,7 +170,17 @@ export async function savePrediction(
       { onConflict: 'user_id,match_id' },
     )
 
-  if (error) throw error
+  if (!error) return
+
+  // Fallback: score columns may not exist yet (migration 005)
+  const { error: fallbackError } = await supabase
+    .from('predictions')
+    .upsert(
+      { user_id: userId, match_id: matchId, pick: derivedPick },
+      { onConflict: 'user_id,match_id' },
+    )
+
+  if (fallbackError) throw fallbackError
 }
 
 export async function getGroupPredictions(groupId: string): Promise<GroupPrediction[]> {
@@ -158,8 +195,22 @@ export async function getStandings(groupId: string): Promise<Standing[]> {
     .select('group_id, user_id, display_name, points, exact_count, last_correct_at')
     .eq('group_id', groupId)
 
-  if (error) throw error
-  return (data ?? []) as Standing[]
+  if (!error) {
+    return (data ?? []) as Standing[]
+  }
+
+  // Fallback: exact_count/last_correct_at may not exist yet (migration 005)
+  const { data: fallback, error: fallbackError } = await supabase
+    .from('group_standings')
+    .select('group_id, user_id, display_name, points')
+    .eq('group_id', groupId)
+
+  if (fallbackError) throw fallbackError
+  return (fallback ?? []).map((row: any) => ({
+    ...row,
+    exact_count: 0,
+    last_correct_at: null,
+  } as Standing))
 }
 
 export type GroupMessage = {
@@ -226,7 +277,7 @@ export async function getPublicUserPredictions(userId: string, groupId: string):
 
 export async function getLeaderboardHistory(groupId: string): Promise<LeaderboardSnapshot[]> {
   const { data, error } = await supabase.rpc('get_leaderboard_history', { target_group_id: groupId })
-  if (error) throw error
+  if (error) return [] // RPC may not exist yet (migration 007)
   return (data ?? []) as LeaderboardSnapshot[]
 }
 
@@ -275,7 +326,7 @@ export async function getTodayMatchEvents(): Promise<MatchEvent[]> {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  if (error) throw error
+  if (error) return [] // Table may not exist yet (migration 008)
   return (data ?? []) as MatchEvent[]
 }
 
@@ -310,7 +361,7 @@ export async function updateGroupLockMinutes(groupId: string, lockMinutesBefore:
 
 export async function getGroupReactions(groupId: string): Promise<Record<number, ReactionSummary[]>> {
   const { data, error } = await supabase.rpc('get_group_reactions', { target_group_id: groupId })
-  if (error) throw error
+  if (error) return {} // RPC may not exist yet (migration 009)
   const map: Record<number, ReactionSummary[]> = {}
   for (const row of (data ?? []) as ReactionSummary[]) {
     if (!map[row.match_id]) map[row.match_id] = []
@@ -321,7 +372,7 @@ export async function getGroupReactions(groupId: string): Promise<Record<number,
 
 export async function toggleReaction(matchId: number, groupId: string, userId: string, emoji: string): Promise<boolean> {
   // Check if reaction exists
-  const { data: existing } = await supabase
+  const { data: existing, error: checkError } = await supabase
     .from('match_reactions')
     .select('id')
     .eq('match_id', matchId)
@@ -329,6 +380,8 @@ export async function toggleReaction(matchId: number, groupId: string, userId: s
     .eq('user_id', userId)
     .eq('emoji', emoji)
     .maybeSingle()
+
+  if (checkError) throw checkError // Table may not exist
 
   if (existing) {
     const { error } = await supabase
