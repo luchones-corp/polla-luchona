@@ -1,10 +1,8 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { Avatar } from './Avatar'
 import { GroupChat } from './GroupChat'
 import { ICONS } from './Icons'
-import { addGhostPlayer, createGroupArchive, updateGroupLockMinutes } from '../lib/api'
+import { updateGroupLockMinutes } from '../lib/api'
 import { useLocale } from '../contexts/LocaleContext'
 import type { Group, GroupMember } from '../lib/types'
 
@@ -19,8 +17,6 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
   onGroupUpdated?: () => void
 }) {
   const { t } = useLocale()
-  const navigate = useNavigate()
-  const [archiving, setArchiving] = useState(false)
 
   const lockOptions = [
     { value: 0, label: t('grupo.lockAtStart') },
@@ -135,45 +131,7 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
               ))}
             </select>
           </div>
-          <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-dark btn-sm"
-              onClick={async () => {
-                try {
-                  await addGhostPlayer(selectedGroup.id)
-                  toast(t('grupo.botAdded'))
-                  onGroupUpdated?.()
-                } catch {
-                  toast(t('grupo.botError'))
-                }
-              }}
-            >
-              {'\uD83C\uDFB2'} {t('grupo.addBot')}
-            </button>
-            <button
-              className="btn btn-dark btn-sm"
-              disabled={archiving}
-              onClick={async () => {
-                setArchiving(true)
-                try {
-                  await createGroupArchive(selectedGroup.id)
-                  toast(t('grupo.archived'))
-                } catch {
-                  toast(t('grupo.archiveError'))
-                } finally {
-                  setArchiving(false)
-                }
-              }}
-            >
-              {archiving ? t('grupo.archiving') : `\uD83D\uDCE6 ${t('grupo.archiveBtn')}`}
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => navigate(`/archive/${selectedGroup.id}`)}
-            >
-              {t('grupo.viewArchive')}
-            </button>
-          </div>
+          {/* Bot, archive, and view-archive buttons are hidden until migrations 011 are run */}
         </div>
       )}
 
