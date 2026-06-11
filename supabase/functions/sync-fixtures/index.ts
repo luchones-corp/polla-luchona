@@ -252,8 +252,14 @@ function toRows(apiMatches: ApiMatch[]) {
       }
     }
 
-    const status = mapStatus(m.status)
+    let status = mapStatus(m.status)
     const { ft_home, ft_away } = getScores(m.score, status)
+
+    // Don't mark as finished if the API hasn't populated scores yet
+    // (football-data.org sometimes returns FINISHED before scores are available)
+    if (status === 'finished' && ft_home === null && ft_away === null) {
+      status = 'live'
+    }
 
     // Extract group letter from API value like "GROUP_A" → "A"
     const groupLabel = m.group ? m.group.replace('GROUP_', '') : null
