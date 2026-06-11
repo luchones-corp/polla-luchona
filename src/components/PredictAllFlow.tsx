@@ -45,10 +45,15 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
   const fixture = unpredicted[index]
   const scores = localScores[fixture.id]
 
+  const hasPick = !!predictionsByMatch[fixture.id]?.pick
+
   function handlePick(matchId: number, pick: MatchPick) {
     onPick(matchId, pick)
-    setPredicted(p => p + 1)
-    setTimeout(() => setIndex(i => i + 1), 400)
+    if (!hasPick) setPredicted(p => p + 1)
+  }
+
+  function handleNext() {
+    setIndex(i => i + 1)
   }
 
   function handleScoreChange(home: number | null, away: number | null) {
@@ -102,10 +107,15 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
           onScoreChange={handleScoreChange}
         />
 
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setIndex(i => i + 1)}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
+          <button className="btn btn-ghost btn-sm" onClick={handleNext}>
             {t('predictAll.skip')}
           </button>
+          {hasPick && (
+            <button className="btn btn-primary btn-sm" onClick={handleNext}>
+              {t('predictAll.next')}
+            </button>
+          )}
         </div>
       </div>
     </div>,

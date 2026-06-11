@@ -119,6 +119,7 @@ export const es: Record<string, string> = {
   'predictAll.title': 'Prediccion rapida',
   'predictAll.of': 'de',
   'predictAll.skip': 'Saltar →',
+  'predictAll.next': 'Siguiente →',
 
   // Status pill
   'status.live': 'EN VIVO',
