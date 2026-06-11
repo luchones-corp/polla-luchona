@@ -10,6 +10,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { JoinGroupPage } from './pages/JoinGroupPage'
 import { ArchivePage } from './pages/ArchivePage'
 import { ProfilePage } from './pages/ProfilePage'
+import { Analytics } from "@vercel/analytics/next"
 
 export function App() {
   const { t } = useLocale()
@@ -151,6 +152,7 @@ export function App() {
         />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Analytics />
     </>
   )
 }
