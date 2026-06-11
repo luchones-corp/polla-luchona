@@ -385,7 +385,7 @@ button, input { font-family: inherit; }
 .trow-id { display: flex; align-items: center; gap: 13px; flex: 1; min-width: 0; }
 .trow-name {
   font-family: var(--font-head); font-weight: 800; font-size: 15px; letter-spacing: -.01em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink-2);
 }
 .trow-locked-score {
   font-family: var(--font-disp); font-size: 20px; color: var(--ink-2);
