@@ -7,7 +7,7 @@ import { updateGroupLockMinutes, updateGroupName } from '../lib/api'
 import { useLocale } from '../contexts/LocaleContext'
 import type { Group, GroupMember } from '../lib/types'
 
-export function GrupoView({ selectedGroup, isOwner, members, session, onRegenerateInvite, onRemoveMember, onLeaveGroup, toast, onGroupUpdated }: {
+export function GrupoView({ selectedGroup, isOwner, members, session, onRegenerateInvite, onRemoveMember, onLeaveGroup, onDeleteGroup, toast, onGroupUpdated }: {
   selectedGroup: Group | null
   isOwner: boolean
   members: GroupMember[]
@@ -15,6 +15,7 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
   onRegenerateInvite: () => void
   onRemoveMember: (id: string) => void
   onLeaveGroup: () => void
+  onDeleteGroup: () => void
   toast: (msg: string) => void
   onGroupUpdated?: () => void
 }) {
@@ -116,6 +117,7 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
             <label style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>{t('grupo.nameLabel')}</label>
             <input
+              key={selectedGroup.id}
               defaultValue={selectedGroup.name}
               onBlur={async (e) => {
                 const val = e.target.value.trim()
@@ -162,7 +164,11 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
               ))}
             </select>
           </div>
-          {/* Bot, archive, and view-archive buttons are hidden until migrations 011 are run */}
+          {members.length === 1 && (
+            <button className="btn btn-danger btn-sm" style={{ marginTop: 16, width: '100%' }} onClick={onDeleteGroup}>
+              {t('grupo.delete')}
+            </button>
+          )}
         </div>
       )}
 

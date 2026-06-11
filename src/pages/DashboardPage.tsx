@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import {
   createGroup,
+  deleteGroup,
   getFixtures,
   getGroupMembers,
   getGroupReactions,
@@ -182,6 +183,19 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       await reloadBaseData()
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('grupo.leaveError'))
+    }
+  }
+
+  async function handleDeleteGroup() {
+    if (!selectedGroupId || !isOwner) return
+    if (!window.confirm(t('grupo.deleteConfirm'))) return
+    setError(null)
+    try {
+      await deleteGroup(selectedGroupId)
+      showToast(t('grupo.deleted'))
+      await reloadBaseData()
+    } catch (caughtError) {
+      setError(caughtError instanceof Error ? caughtError.message : t('grupo.deleteError'))
     }
   }
 
@@ -479,6 +493,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             onRegenerateInvite={handleRegenerateInvite}
             onRemoveMember={handleRemoveMember}
             onLeaveGroup={handleLeaveGroup}
+            onDeleteGroup={handleDeleteGroup}
             toast={showToast}
             onGroupUpdated={() => void reloadBaseData()}
           />
