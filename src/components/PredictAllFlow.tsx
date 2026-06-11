@@ -1,10 +1,29 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { isBeforeKickoff } from '../lib/date'
 import { useLocale } from '../contexts/LocaleContext'
 import { FlagImg } from './FlagImg'
-import { PickSelector } from './PickSelector'
 import type { Fixture, MatchPick, Prediction } from '../lib/types'
+
+function ScoreStepper({ value, onChange }: {
+  value: number | null
+  onChange: (v: number | null) => void
+}) {
+  function step(d: number) {
+    const cur = value ?? 0
+    const next = cur + d
+    if (next < 0 || next > 9) return
+    onChange(next)
+  }
+
+  return (
+    <div className={'stepper' + (value === null ? ' empty' : '')} onClick={e => e.stopPropagation()}>
+      <button type="button" onClick={() => step(-1)} aria-label="minus">&minus;</button>
+      <span className="stepper-val">{value ?? '\u00B7'}</span>
+      <button type="button" onClick={() => step(1)} aria-label="plus">+</button>
+    </div>
+  )
+}
 
 export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreChange, onClose }: {
   fixtures: Fixture[]
@@ -20,6 +39,7 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
 
   const [index, setIndex] = useState(0)
   const [predicted, setPredicted] = useState(0)
+  const [localPicks, setLocalPicks] = useState<Record<number, MatchPick>>({})
   const [localScores, setLocalScores] = useState<Record<number, { home: number | null; away: number | null }>>({})
 
   if (unpredicted.length === 0 || index >= unpredicted.length) {
@@ -43,22 +63,30 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
   }
 
   const fixture = unpredicted[index]
-  const scores = localScores[fixture.id]
+  const currentPick = localPicks[fixture.id] ?? predictionsByMatch[fixture.id]?.pick
+  const scores = localScores[fixture.id] ?? { home: null, away: null }
+  const hasPick = !!currentPick
 
-  const hasPick = !!predictionsByMatch[fixture.id]?.pick
-
-  function handlePick(matchId: number, pick: MatchPick) {
-    onPick(matchId, pick)
+  function handlePick(pick: MatchPick) {
+    setLocalPicks(p => ({ ...p, [fixture.id]: pick }))
+    onPick(fixture.id, pick)
     if (!hasPick) setPredicted(p => p + 1)
+  }
+
+  function handleScoreHome(v: number | null) {
+    const newScores = { home: v, away: scores.away }
+    setLocalScores(s => ({ ...s, [fixture.id]: newScores }))
+    onScoreChange(fixture.id, v, scores.away)
+  }
+
+  function handleScoreAway(v: number | null) {
+    const newScores = { home: scores.home, away: v }
+    setLocalScores(s => ({ ...s, [fixture.id]: newScores }))
+    onScoreChange(fixture.id, scores.home, v)
   }
 
   function handleNext() {
     setIndex(i => i + 1)
-  }
-
-  function handleScoreChange(home: number | null, away: number | null) {
-    setLocalScores(s => ({ ...s, [fixture.id]: { home, away } }))
-    onScoreChange(fixture.id, home, away)
   }
 
   return createPortal(
@@ -84,28 +112,49 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
           </span>
         </div>
 
-        <div className="fx-main" style={{ marginBottom: 16 }}>
-          <div className="fx-team">
-            <FlagImg teamId={fixture.home_team_id} w={38} />
-            <span className="tn">{fixture.home_team_name}</span>
-          </div>
-          <div className="fx-mid">
-            <div className="vs">{t('common.vs')}</div>
-          </div>
-          <div className="fx-team right">
-            <FlagImg teamId={fixture.away_team_id} w={38} />
-            <span className="tn">{fixture.away_team_name}</span>
-          </div>
-        </div>
+        <div className="rows">
+          <button
+            type="button"
+            className={'trow' + (currentPick === 'HOME' ? ' sel' : '')}
+            onClick={() => handlePick('HOME')}
+          >
+            <span className="trow-id">
+              <FlagImg teamId={fixture.home_team_id} w={34} />
+              <span className="trow-name">{fixture.home_team_name}</span>
+            </span>
+            <ScoreStepper value={scores.home} onChange={handleScoreHome} />
+            <span className="pickdot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </span>
+          </button>
 
-        <PickSelector
-          fixture={fixture}
-          value={predictionsByMatch[fixture.id]?.pick}
-          onChange={(pick) => handlePick(fixture.id, pick)}
-          scoreHome={scores?.home ?? null}
-          scoreAway={scores?.away ?? null}
-          onScoreChange={handleScoreChange}
-        />
+          <div className="draw-strip">
+            <span className="draw-ln" />
+            <button
+              type="button"
+              className={'draw-btn' + (currentPick === 'DRAW' ? ' sel' : '')}
+              onClick={() => handlePick('DRAW')}
+            >
+              <span className="draw-xm">{'\u2715'}</span> {t('pick.draw')}
+            </button>
+            <span className="draw-ln" />
+          </div>
+
+          <button
+            type="button"
+            className={'trow' + (currentPick === 'AWAY' ? ' sel' : '')}
+            onClick={() => handlePick('AWAY')}
+          >
+            <span className="trow-id">
+              <FlagImg teamId={fixture.away_team_id} w={34} />
+              <span className="trow-name">{fixture.away_team_name}</span>
+            </span>
+            <ScoreStepper value={scores.away} onChange={handleScoreAway} />
+            <span className="pickdot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            </span>
+          </button>
+        </div>
 
         <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
           <button className="btn btn-ghost btn-sm" onClick={handleNext}>

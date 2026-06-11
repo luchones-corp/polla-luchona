@@ -24,6 +24,9 @@ export const es: Record<string, string> = {
   'auth.loading': 'Cargando...',
   'auth.signinBtn': 'Entrar',
   'auth.signupBtn': 'Crear cuenta',
+  'auth.googleBtn': 'Continuar con Google',
+  'auth.orDivider': 'o',
+  'auth.emailOption': 'Entrar con correo',
 
   // Display name
   'displayName.required': 'Tu nombre para mostrar es obligatorio.',

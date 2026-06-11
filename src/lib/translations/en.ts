@@ -24,6 +24,9 @@ export const en: Record<string, string> = {
   'auth.loading': 'Loading...',
   'auth.signinBtn': 'Sign in',
   'auth.signupBtn': 'Sign up',
+  'auth.googleBtn': 'Continue with Google',
+  'auth.orDivider': 'or',
+  'auth.emailOption': 'Sign in with email',
 
   // Display name
   'displayName.required': 'A display name is required.',

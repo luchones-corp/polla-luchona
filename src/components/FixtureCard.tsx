@@ -4,7 +4,6 @@ import { formatCountdown } from '../lib/countdown'
 import { useLocale } from '../contexts/LocaleContext'
 import { FlagImg } from './FlagImg'
 import { StatusPill } from './StatusPill'
-import { PickSelector } from './PickSelector'
 import { ReactionBar } from './ReactionBar'
 import type { Fixture, GroupPrediction, MatchPick, Prediction, ReactionSummary } from '../lib/types'
 
@@ -33,6 +32,29 @@ function getPointsEarned(fixture: Fixture, prediction: Prediction | undefined): 
   return { pts: 0, isExact: false }
 }
 
+function ScoreStepper({ value, onChange, disabled }: {
+  value: number | null
+  onChange: (v: number | null) => void
+  disabled?: boolean
+}) {
+  function step(d: number) {
+    if (disabled) return
+    const cur = value ?? 0
+    const next = cur + d
+    if (next < 0) return
+    if (next > 9) return
+    onChange(next)
+  }
+
+  return (
+    <div className={'stepper' + (value === null ? ' empty' : '')} onClick={e => e.stopPropagation()}>
+      <button type="button" onClick={() => step(-1)} disabled={disabled} aria-label="minus">&minus;</button>
+      <span className="stepper-val">{value ?? '\u00B7'}</span>
+      <button type="button" onClick={() => step(1)} disabled={disabled} aria-label="plus">+</button>
+    </div>
+  )
+}
+
 export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreChange, groupId, userId, reactions, lockMinutesBefore = 0 }: {
   fixture: Fixture
   prediction?: Prediction
@@ -48,70 +70,126 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
   const [showReveals, setShowReveals] = useState(false)
   const currentPick = prediction?.pick
   const hasScore = fixture.ft_home !== null && fixture.ft_away !== null
-  const isCorrect = fixture.status === 'finished' && fixture.outcome !== null && currentPick === fixture.outcome
-  const isIncorrect = fixture.status === 'finished' && fixture.outcome !== null && !!currentPick && currentPick !== fixture.outcome
+  const isFinished = fixture.status === 'finished'
+  const isCorrect = isFinished && fixture.outcome !== null && currentPick === fixture.outcome
+  const isIncorrect = isFinished && fixture.outcome !== null && !!currentPick && currentPick !== fixture.outcome
   const canReveal = !isBeforeKickoff(fixture.kickoff_at) && groupPicks && groupPicks.length > 0
   const { pts, isExact } = getPointsEarned(fixture, prediction)
+  const locked = !isBeforeLockTime(fixture.kickoff_at, lockMinutesBefore)
   const pickLabel: Record<MatchPick, string> = { HOME: t('pick.home'), DRAW: 'X', AWAY: t('pick.away') }
 
-  let cardCls = 'fx-card'
+  let cardCls = 'mc'
   if (fixture.status === 'live') cardCls += ' is-live'
   if (isExact) cardCls += ' exact'
   else if (isCorrect) cardCls += ' correct'
   if (isIncorrect) cardCls += ' incorrect'
 
+  function handleRowClick(pick: MatchPick) {
+    if (locked) return
+    onPick(fixture.id, pick)
+  }
+
+  function handleScoreHome(v: number | null) {
+    onScoreChange?.(fixture.id, v, prediction?.score_away ?? null)
+  }
+
+  function handleScoreAway(v: number | null) {
+    onScoreChange?.(fixture.id, prediction?.score_home ?? null, v)
+  }
+
   return (
     <div className={cardCls}>
-      <div className="fx-top">
-        <span className="grp">{fixture.stage === 'group' ? t('fx.groupStage') : fixture.stage.toUpperCase()}</span>
+      {/* header */}
+      <div className="mc-head">
+        <span className="mc-grp">
+          {fixture.stage === 'group' && fixture.group_label && (
+            <><span className="mc-gtag">{t('partidos.groupLabel')} {fixture.group_label}</span><span className="mc-dot" /></>
+          )}
+          {fixture.stage === 'group' ? t('fx.groupStage') : fixture.stage.toUpperCase()}
+        </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {fixture.status === 'finished' && currentPick && (
+          {isFinished && currentPick && (
             <span className={isExact ? 'chip chip-gold' : isCorrect ? 'chip chip-lime' : 'chip'}>
               {isExact ? t('fx.exactPts') : isCorrect ? t('fx.correctPt') : t('fx.wrongPts')}
             </span>
           )}
+          {fixture.status === 'scheduled' && isBeforeKickoff(fixture.kickoff_at) && (
+            <CountdownLabel kickoffIso={fixture.kickoff_at} />
+          )}
           <StatusPill fixture={fixture} />
         </div>
       </div>
-      <div className="fx-main">
-        <div className="fx-team">
-          <FlagImg teamId={fixture.home_team_id} w={38} />
-          <span className="tn">{fixture.home_team_name}</span>
+
+      {/* final score banner for finished matches */}
+      {hasScore && (
+        <div className="mc-final-score">
+          <FlagImg teamId={fixture.home_team_id} w={22} />
+          <span className="mc-fs-val">{fixture.ft_home}</span>
+          <span className="mc-fs-dash">&ndash;</span>
+          <span className="mc-fs-val">{fixture.ft_away}</span>
+          <FlagImg teamId={fixture.away_team_id} w={22} />
         </div>
-        <div className="fx-mid">
-          {hasScore ? (
-            <div className="fx-score">{fixture.ft_home} - {fixture.ft_away}</div>
-          ) : (
-            <div className="vs">{t('common.vs')}</div>
+      )}
+
+      {/* tap-a-team rows */}
+      <div className="rows">
+        <button
+          type="button"
+          className={'trow' + (currentPick === 'HOME' ? ' sel' : '')}
+          onClick={() => handleRowClick('HOME')}
+          disabled={locked}
+        >
+          <span className="trow-id">
+            <FlagImg teamId={fixture.home_team_id} w={34} />
+            <span className="trow-name">{fixture.home_team_name}</span>
+          </span>
+          {onScoreChange && !locked && (
+            <ScoreStepper value={prediction?.score_home ?? null} onChange={handleScoreHome} disabled={locked} />
           )}
+          {locked && prediction?.score_home != null && (
+            <span className="trow-locked-score">{prediction.score_home}</span>
+          )}
+          <span className="pickdot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </span>
+        </button>
+
+        <div className="draw-strip">
+          <span className="draw-ln" />
+          <button
+            type="button"
+            className={'draw-btn' + (currentPick === 'DRAW' ? ' sel' : '')}
+            onClick={() => handleRowClick('DRAW')}
+            disabled={locked}
+          >
+            <span className="draw-xm">{'\u2715'}</span> {t('pick.draw')}
+          </button>
+          <span className="draw-ln" />
         </div>
-        <div className="fx-team right">
-          <FlagImg teamId={fixture.away_team_id} w={38} />
-          <span className="tn">{fixture.away_team_name}</span>
-        </div>
-      </div>
-      {prediction && prediction.score_home !== null && prediction.score_away !== null && !isBeforeLockTime(fixture.kickoff_at, lockMinutesBefore) && (
-        <div className="fx-predicted-score">
-          {t('fx.yourScore')} {prediction.score_home} - {prediction.score_away}
-        </div>
-      )}
-      {fixture.status === 'scheduled' && isBeforeKickoff(fixture.kickoff_at) && (
-        <div style={{ textAlign: 'center' }}>
-          <CountdownLabel kickoffIso={fixture.kickoff_at} />
-        </div>
-      )}
-      <div className="fx-pick-wrap">
-        <PickSelector
-          fixture={fixture}
-          value={currentPick}
-          onChange={(pick) => onPick(fixture.id, pick)}
-          scoreHome={prediction?.score_home}
-          scoreAway={prediction?.score_away}
-          onScoreChange={onScoreChange ? (h, a) => onScoreChange(fixture.id, h, a) : undefined}
-          lockMinutesBefore={lockMinutesBefore}
-        />
+
+        <button
+          type="button"
+          className={'trow' + (currentPick === 'AWAY' ? ' sel' : '')}
+          onClick={() => handleRowClick('AWAY')}
+          disabled={locked}
+        >
+          <span className="trow-id">
+            <FlagImg teamId={fixture.away_team_id} w={34} />
+            <span className="trow-name">{fixture.away_team_name}</span>
+          </span>
+          {onScoreChange && !locked && (
+            <ScoreStepper value={prediction?.score_away ?? null} onChange={handleScoreAway} disabled={locked} />
+          )}
+          {locked && prediction?.score_away != null && (
+            <span className="trow-locked-score">{prediction.score_away}</span>
+          )}
+          <span className="pickdot">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </span>
+        </button>
       </div>
 
+      {/* group prediction reveals */}
       {canReveal && (
         <div className="fx-reveals-wrap">
           <button className="btn-reveal" onClick={() => setShowReveals(v => !v)}>
@@ -147,12 +225,14 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
         </div>
       )}
 
+      {/* reactions */}
       {groupId && userId && !isBeforeKickoff(fixture.kickoff_at) && (
         <ReactionBar matchId={fixture.id} groupId={groupId} userId={userId} reactions={reactions ?? []} />
       )}
 
+      {/* correct badge */}
       {(isCorrect || isExact) && (
-        <div className={'fx-correct-badge' + (isExact ? ' exact' : '')}>
+        <div className={'mc-badge' + (isExact ? ' exact' : '')}>
           {isExact ? (
             <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87L18.18 22 12 18.56 5.82 22 7 14.14l-5-4.87 6.91-1.01z" /></svg>
           ) : (
