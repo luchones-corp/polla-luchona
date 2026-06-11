@@ -164,6 +164,7 @@ export const en: Record<string, string> = {
   'grupo.youTag': 'YOU',
   'grupo.remove': 'Remove',
   'grupo.settings': 'Settings',
+  'grupo.nameLabel': 'Group name:',
   'grupo.lockLabel': 'Lock predictions:',
   'grupo.lockAtStart': 'At match start',
   'grupo.lock15': '15 min before',

@@ -382,6 +382,14 @@ export async function createGroupArchive(groupId: string): Promise<void> {
   if (error) throw error
 }
 
+export async function updateGroupName(groupId: string, name: string): Promise<void> {
+  const { error } = await supabase
+    .from('groups')
+    .update({ name })
+    .eq('id', groupId)
+  if (error) throw error
+}
+
 export async function updateGroupLockMinutes(groupId: string, lockMinutesBefore: number): Promise<void> {
   const { error } = await supabase
     .from('groups')

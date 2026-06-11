@@ -164,6 +164,7 @@ export const es: Record<string, string> = {
   'grupo.youTag': 'TU',
   'grupo.remove': 'Quitar',
   'grupo.settings': 'Configuracion',
+  'grupo.nameLabel': 'Nombre del grupo:',
   'grupo.lockLabel': 'Cerrar predicciones:',
   'grupo.lockAtStart': 'Al inicio del partido',
   'grupo.lock15': '15 min antes',

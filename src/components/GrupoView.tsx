@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { Avatar } from './Avatar'
 import { GroupChat } from './GroupChat'
 import { ICONS } from './Icons'
-import { updateGroupLockMinutes } from '../lib/api'
+import { updateGroupLockMinutes, updateGroupName } from '../lib/api'
 import { useLocale } from '../contexts/LocaleContext'
 import type { Group, GroupMember } from '../lib/types'
 
@@ -112,6 +113,30 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
       {isOwner && (
         <div className="card group-settings" style={{ padding: '18px 20px', marginTop: 20 }}>
           <h3 style={{ fontSize: 16, fontFamily: 'var(--font-head)', fontWeight: 800, marginBottom: 12 }}>{t('grupo.settings')}</h3>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+            <label style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>{t('grupo.nameLabel')}</label>
+            <input
+              defaultValue={selectedGroup.name}
+              onBlur={async (e) => {
+                const val = e.target.value.trim()
+                if (!val || val === selectedGroup.name) { e.target.value = selectedGroup.name; return }
+                try {
+                  await updateGroupName(selectedGroup.id, val)
+                  toast(t('grupo.settingsUpdated'))
+                  onGroupUpdated?.()
+                } catch {
+                  e.target.value = selectedGroup.name
+                  toast(t('grupo.settingsError'))
+                }
+              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              style={{
+                padding: '6px 12px', borderRadius: 8, border: '1px solid var(--line-2)',
+                background: 'var(--surface-2)', color: 'var(--ink)', fontSize: 13,
+                fontFamily: 'var(--font-body)', flex: 1, minWidth: 140,
+              }}
+            />
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <label style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>{t('grupo.lockLabel')}</label>
             <select
