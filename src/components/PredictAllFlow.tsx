@@ -69,6 +69,8 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
 
   function handlePick(pick: MatchPick) {
     setLocalPicks(p => ({ ...p, [fixture.id]: pick }))
+    // Clear local scores — manual tap = "just winner" mode
+    setLocalScores(s => ({ ...s, [fixture.id]: { home: null, away: null } }))
     onPick(fixture.id, pick)
     if (!hasPick) setPredicted(p => p + 1)
   }

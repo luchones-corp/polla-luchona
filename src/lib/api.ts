@@ -198,13 +198,10 @@ export async function savePrediction(
   scoreHome: number | null = null,
   scoreAway: number | null = null,
 ): Promise<void> {
-  const derivedPick = scoreHome !== null && scoreAway !== null
-    ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
-    : pick
   const { error } = await supabase
     .from('predictions')
     .upsert(
-      { user_id: userId, match_id: matchId, pick: derivedPick, score_home: scoreHome, score_away: scoreAway },
+      { user_id: userId, match_id: matchId, pick, score_home: scoreHome, score_away: scoreAway },
       { onConflict: 'user_id,match_id' },
     )
 
@@ -214,7 +211,7 @@ export async function savePrediction(
   const { error: fallbackError } = await supabase
     .from('predictions')
     .upsert(
-      { user_id: userId, match_id: matchId, pick: derivedPick },
+      { user_id: userId, match_id: matchId, pick },
       { onConflict: 'user_id,match_id' },
     )
 

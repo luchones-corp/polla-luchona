@@ -183,17 +183,19 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
 
   async function handlePick(matchId: number, pick: MatchPick) {
     setError(null)
+    // Cancel any pending score save — manual pick takes priority
+    clearTimeout(scoreTimers.current[matchId])
     try {
-      const existing = predictionsByMatch[matchId]
-      await savePrediction(session.user.id, matchId, pick, existing?.score_home ?? null, existing?.score_away ?? null)
+      // Clear scores: manual row tap = "just winner" mode
+      await savePrediction(session.user.id, matchId, pick, null, null)
       setPredictionsByMatch(current => ({
         ...current,
         [matchId]: {
           id: current[matchId]?.id ?? `local-${matchId}`,
           match_id: matchId,
           pick,
-          score_home: current[matchId]?.score_home ?? null,
-          score_away: current[matchId]?.score_away ?? null,
+          score_home: null,
+          score_away: null,
           updated_at: new Date().toISOString(),
         },
       }))
