@@ -109,9 +109,6 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       setGroups(nextGroups)
       setFixtures(nextFixtures)
       setPredictionsByMatch(predictionMap)
-      const fallbackGroupId = selectedGroupId && nextGroups.some(g => g.id === selectedGroupId)
-        ? selectedGroupId : nextGroups[0]?.id ?? null
-      setSelectedGroupId(fallbackGroupId)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.loadError'))
     } finally {
@@ -124,6 +121,13 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     const timer = window.setInterval(() => { void reloadBaseData() }, 30_000)
     return () => window.clearInterval(timer)
   }, [session.user.id])
+
+  // Validate selectedGroupId against current groups list
+  useEffect(() => {
+    if (groups.length === 0) return
+    if (selectedGroupId && groups.some(g => g.id === selectedGroupId)) return
+    setSelectedGroupId(groups[0].id)
+  }, [groups, selectedGroupId])
 
   useEffect(() => {
     if (!selectedGroupId) { setMembers([]); setStandings([]); setGroupPredictions([]); setReactionsByMatch({}); return }
