@@ -80,6 +80,7 @@ export const en: Record<string, string> = {
   'fx.showPredictions': 'Show predictions',
   'fx.hidePredictions': 'Hide predictions',
   'fx.noName': 'No name',
+  'fx.yourPick': 'Your pick',
 
   // Pick selector
   'pick.home': 'Home',

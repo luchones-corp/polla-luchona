@@ -353,6 +353,29 @@ button, input { font-family: inherit; }
 }
 .mc-badge.exact { background: var(--gold); }
 
+/* collapsed state */
+.mc-collapsed { gap: 8px; padding: 12px 16px; }
+.mc-chevron { color: var(--ink-3); }
+.mc-summary { cursor: pointer; }
+.mc-summary-score {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-family: var(--font-head); font-weight: 800; font-size: 14px;
+}
+.mc-summary-score .mc-fs-val { font-size: 20px; }
+.mc-summary-score .mc-fs-dash { font-size: 16px; }
+.mc-summary-team {
+  font-family: var(--font-head); font-weight: 700; font-size: 13px;
+  color: var(--ink-2); max-width: 90px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.mc-summary-pick {
+  text-align: center; font-family: var(--font-head); font-weight: 600; font-size: 12px;
+  color: var(--ink-3); margin-top: 4px;
+}
+.mc-summary-pscore { color: var(--ink-3); margin-left: 4px; }
+.txt-lime { color: var(--lime); }
+.txt-gold { color: var(--gold); }
+.txt-muted { color: var(--ink-3); }
+
 /* final score banner */
 .mc-final-score {
   display: flex; align-items: center; justify-content: center; gap: 10px;

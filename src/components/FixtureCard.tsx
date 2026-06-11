@@ -68,9 +68,10 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
 }) {
   const { t } = useLocale()
   const [showReveals, setShowReveals] = useState(false)
+  const isFinished = fixture.status === 'finished'
+  const [collapsed, setCollapsed] = useState(isFinished)
   const currentPick = prediction?.pick
   const hasScore = fixture.ft_home !== null && fixture.ft_away !== null
-  const isFinished = fixture.status === 'finished'
   const isCorrect = isFinished && fixture.outcome !== null && currentPick === fixture.outcome
   const isIncorrect = isFinished && fixture.outcome !== null && !!currentPick && currentPick !== fixture.outcome
   const canReveal = !isBeforeKickoff(fixture.kickoff_at) && groupPicks && groupPicks.length > 0
@@ -83,6 +84,7 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
   if (isExact) cardCls += ' exact'
   else if (isCorrect) cardCls += ' correct'
   if (isIncorrect) cardCls += ' incorrect'
+  if (collapsed) cardCls += ' mc-collapsed'
 
   function handleRowClick(pick: MatchPick) {
     if (locked) return
@@ -99,10 +101,12 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
     onScoreChange?.(fixture.id, home, v)
   }
 
+  const pickLabelShort: Record<MatchPick, string> = { HOME: fixture.home_team_name ?? t('pick.home'), DRAW: t('pick.draw'), AWAY: fixture.away_team_name ?? t('pick.away') }
+
   return (
     <div className={cardCls}>
       {/* header */}
-      <div className="mc-head">
+      <div className="mc-head" onClick={isFinished ? () => setCollapsed(c => !c) : undefined} style={isFinished ? { cursor: 'pointer' } : undefined}>
         <span className="mc-grp">
           {fixture.stage === 'group' && fixture.group_label && (
             <><span className="mc-gtag">{t('partidos.groupLabel')} {fixture.group_label}</span><span className="mc-dot" /></>
@@ -119,117 +123,148 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
             <CountdownLabel kickoffIso={fixture.kickoff_at} />
           )}
           <StatusPill fixture={fixture} />
-        </div>
-      </div>
-
-      {/* final score banner for finished matches */}
-      {hasScore && (
-        <div className="mc-final-score">
-          <FlagImg teamId={fixture.home_team_id} w={22} />
-          <span className="mc-fs-val">{fixture.ft_home}</span>
-          <span className="mc-fs-dash">&ndash;</span>
-          <span className="mc-fs-val">{fixture.ft_away}</span>
-          <FlagImg teamId={fixture.away_team_id} w={22} />
-        </div>
-      )}
-
-      {/* tap-a-team rows */}
-      <div className="rows">
-        <button
-          type="button"
-          className={'trow' + (currentPick === 'HOME' ? ' sel' : '')}
-          onClick={() => handleRowClick('HOME')}
-          disabled={locked}
-        >
-          <span className="trow-id">
-            <FlagImg teamId={fixture.home_team_id} w={34} />
-            <span className="trow-name">{fixture.home_team_name}</span>
-          </span>
-          {onScoreChange && !locked && (
-            <ScoreStepper value={prediction?.score_home ?? null} onChange={handleScoreHome} disabled={locked} />
-          )}
-          {locked && prediction?.score_home != null && (
-            <span className="trow-locked-score">{prediction.score_home}</span>
-          )}
-          <span className="pickdot">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </span>
-        </button>
-
-        <div className="draw-strip">
-          <span className="draw-ln" />
-          <button
-            type="button"
-            className={'draw-btn' + (currentPick === 'DRAW' ? ' sel' : '')}
-            onClick={() => handleRowClick('DRAW')}
-            disabled={locked}
-          >
-            <span className="draw-xm">{'\u2715'}</span> {t('pick.draw')}
-          </button>
-          <span className="draw-ln" />
-        </div>
-
-        <button
-          type="button"
-          className={'trow' + (currentPick === 'AWAY' ? ' sel' : '')}
-          onClick={() => handleRowClick('AWAY')}
-          disabled={locked}
-        >
-          <span className="trow-id">
-            <FlagImg teamId={fixture.away_team_id} w={34} />
-            <span className="trow-name">{fixture.away_team_name}</span>
-          </span>
-          {onScoreChange && !locked && (
-            <ScoreStepper value={prediction?.score_away ?? null} onChange={handleScoreAway} disabled={locked} />
-          )}
-          {locked && prediction?.score_away != null && (
-            <span className="trow-locked-score">{prediction.score_away}</span>
-          )}
-          <span className="pickdot">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </span>
-        </button>
-      </div>
-
-      {/* group prediction reveals */}
-      {canReveal && (
-        <div className="fx-reveals-wrap">
-          <button className="btn-reveal" onClick={() => setShowReveals(v => !v)}>
-            {showReveals ? t('fx.hidePredictions') : `${t('fx.showPredictions')} (${groupPicks!.length})`}
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"
-              style={{ transform: showReveals ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
+          {isFinished && (
+            <svg className="mc-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.5"
+              style={{ transform: collapsed ? 'none' : 'rotate(180deg)', transition: 'transform .2s', flexShrink: 0 }}>
               <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-          </button>
-          {showReveals && (
-            <div className="fx-reveals">
-              {groupPicks!.map(gp => {
-                const correct = fixture.outcome !== null && gp.pick === fixture.outcome
-                const gpExact = fixture.ft_home !== null && fixture.ft_away !== null
-                  && gp.score_home !== null && gp.score_away !== null
-                  && gp.score_home === fixture.ft_home && gp.score_away === fixture.ft_away
-                return (
-                  <div key={gp.user_id} className={'fx-reveal-row' + (gpExact ? ' exact' : correct ? ' correct' : '')}>
-                    <div className="reveal-name">{gp.display_name ?? t('fx.noName')}</div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {gp.score_home !== null && gp.score_away !== null && (
-                        <span className="reveal-score">{gp.score_home}-{gp.score_away}</span>
-                      )}
-                      <span className={'chip' + (gpExact ? ' chip-gold' : correct ? ' chip-lime' : '')} style={{ fontSize: 11, padding: '3px 8px' }}>
-                        {pickLabel[gp.pick as MatchPick]}
-                      </span>
-                    </div>
-                  </div>
-                )
-              })}
+          )}
+        </div>
+      </div>
+
+      {/* collapsed summary for finished matches */}
+      {collapsed && isFinished ? (
+        <div className="mc-summary" onClick={() => setCollapsed(false)}>
+          <div className="mc-summary-score">
+            <FlagImg teamId={fixture.home_team_id} w={20} />
+            <span className="mc-summary-team">{fixture.home_team_name}</span>
+            <span className="mc-fs-val">{fixture.ft_home}</span>
+            <span className="mc-fs-dash">&ndash;</span>
+            <span className="mc-fs-val">{fixture.ft_away}</span>
+            <span className="mc-summary-team">{fixture.away_team_name}</span>
+            <FlagImg teamId={fixture.away_team_id} w={20} />
+          </div>
+          {currentPick && (
+            <div className="mc-summary-pick">
+              {t('fx.yourPick')}: <span className={isExact ? 'txt-gold' : isCorrect ? 'txt-lime' : 'txt-muted'}>{pickLabelShort[currentPick]}</span>
+              {prediction?.score_home != null && prediction?.score_away != null && (
+                <span className="mc-summary-pscore">({prediction.score_home}-{prediction.score_away})</span>
+              )}
             </div>
           )}
         </div>
-      )}
+      ) : (
+        <>
+          {/* final score banner for finished matches */}
+          {hasScore && (
+            <div className="mc-final-score">
+              <FlagImg teamId={fixture.home_team_id} w={22} />
+              <span className="mc-fs-val">{fixture.ft_home}</span>
+              <span className="mc-fs-dash">&ndash;</span>
+              <span className="mc-fs-val">{fixture.ft_away}</span>
+              <FlagImg teamId={fixture.away_team_id} w={22} />
+            </div>
+          )}
 
-      {/* reactions */}
-      {groupId && userId && !isBeforeKickoff(fixture.kickoff_at) && (
-        <ReactionBar matchId={fixture.id} groupId={groupId} userId={userId} reactions={reactions ?? []} />
+          {/* tap-a-team rows */}
+          <div className="rows">
+            <button
+              type="button"
+              className={'trow' + (currentPick === 'HOME' ? ' sel' : '')}
+              onClick={() => handleRowClick('HOME')}
+              disabled={locked}
+            >
+              <span className="trow-id">
+                <FlagImg teamId={fixture.home_team_id} w={34} />
+                <span className="trow-name">{fixture.home_team_name}</span>
+              </span>
+              {onScoreChange && !locked && (
+                <ScoreStepper value={prediction?.score_home ?? null} onChange={handleScoreHome} disabled={locked} />
+              )}
+              {locked && prediction?.score_home != null && (
+                <span className="trow-locked-score">{prediction.score_home}</span>
+              )}
+              <span className="pickdot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </span>
+            </button>
+
+            <div className="draw-strip">
+              <span className="draw-ln" />
+              <button
+                type="button"
+                className={'draw-btn' + (currentPick === 'DRAW' ? ' sel' : '')}
+                onClick={() => handleRowClick('DRAW')}
+                disabled={locked}
+              >
+                <span className="draw-xm">{'\u2715'}</span> {t('pick.draw')}
+              </button>
+              <span className="draw-ln" />
+            </div>
+
+            <button
+              type="button"
+              className={'trow' + (currentPick === 'AWAY' ? ' sel' : '')}
+              onClick={() => handleRowClick('AWAY')}
+              disabled={locked}
+            >
+              <span className="trow-id">
+                <FlagImg teamId={fixture.away_team_id} w={34} />
+                <span className="trow-name">{fixture.away_team_name}</span>
+              </span>
+              {onScoreChange && !locked && (
+                <ScoreStepper value={prediction?.score_away ?? null} onChange={handleScoreAway} disabled={locked} />
+              )}
+              {locked && prediction?.score_away != null && (
+                <span className="trow-locked-score">{prediction.score_away}</span>
+              )}
+              <span className="pickdot">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4"><path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </span>
+            </button>
+          </div>
+
+          {/* group prediction reveals */}
+          {canReveal && (
+            <div className="fx-reveals-wrap">
+              <button className="btn-reveal" onClick={() => setShowReveals(v => !v)}>
+                {showReveals ? t('fx.hidePredictions') : `${t('fx.showPredictions')} (${groupPicks!.length})`}
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5"
+                  style={{ transform: showReveals ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>
+                  <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+              {showReveals && (
+                <div className="fx-reveals">
+                  {groupPicks!.map(gp => {
+                    const correct = fixture.outcome !== null && gp.pick === fixture.outcome
+                    const gpExact = fixture.ft_home !== null && fixture.ft_away !== null
+                      && gp.score_home !== null && gp.score_away !== null
+                      && gp.score_home === fixture.ft_home && gp.score_away === fixture.ft_away
+                    return (
+                      <div key={gp.user_id} className={'fx-reveal-row' + (gpExact ? ' exact' : correct ? ' correct' : '')}>
+                        <div className="reveal-name">{gp.display_name ?? t('fx.noName')}</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {gp.score_home !== null && gp.score_away !== null && (
+                            <span className="reveal-score">{gp.score_home}-{gp.score_away}</span>
+                          )}
+                          <span className={'chip' + (gpExact ? ' chip-gold' : correct ? ' chip-lime' : '')} style={{ fontSize: 11, padding: '3px 8px' }}>
+                            {pickLabel[gp.pick as MatchPick]}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* reactions */}
+          {groupId && userId && !isBeforeKickoff(fixture.kickoff_at) && (
+            <ReactionBar matchId={fixture.id} groupId={groupId} userId={userId} reactions={reactions ?? []} />
+          )}
+        </>
       )}
 
       {/* correct badge */}
