@@ -10,7 +10,8 @@ import { DashboardPage } from './pages/DashboardPage'
 import { JoinGroupPage } from './pages/JoinGroupPage'
 import { ArchivePage } from './pages/ArchivePage'
 import { ProfilePage } from './pages/ProfilePage'
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 export function App() {
   const { t } = useLocale()
@@ -153,6 +154,7 @@ export function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Analytics />
+      <SpeedInsights />
     </>
   )
 }
