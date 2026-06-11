@@ -76,15 +76,17 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
   }
 
   function handleScoreHome(v: number | null) {
-    const newScores = { home: v, away: scores.away }
+    const away = scores.away ?? (v !== null ? 0 : null)
+    const newScores = { home: v, away }
     setLocalScores(s => ({ ...s, [fixture.id]: newScores }))
-    onScoreChange(fixture.id, v, scores.away)
+    onScoreChange(fixture.id, v, away)
   }
 
   function handleScoreAway(v: number | null) {
-    const newScores = { home: scores.home, away: v }
+    const home = scores.home ?? (v !== null ? 0 : null)
+    const newScores = { home, away: v }
     setLocalScores(s => ({ ...s, [fixture.id]: newScores }))
-    onScoreChange(fixture.id, scores.home, v)
+    onScoreChange(fixture.id, home, v)
   }
 
   function handleNext() {

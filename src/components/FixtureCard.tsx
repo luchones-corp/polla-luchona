@@ -90,11 +90,13 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
   }
 
   function handleScoreHome(v: number | null) {
-    onScoreChange?.(fixture.id, v, prediction?.score_away ?? null)
+    const away = prediction?.score_away ?? (v !== null ? 0 : null)
+    onScoreChange?.(fixture.id, v, away)
   }
 
   function handleScoreAway(v: number | null) {
-    onScoreChange?.(fixture.id, prediction?.score_home ?? null, v)
+    const home = prediction?.score_home ?? (v !== null ? 0 : null)
+    onScoreChange?.(fixture.id, home, v)
   }
 
   return (
