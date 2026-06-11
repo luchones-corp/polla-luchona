@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { isBeforeKickoff } from '../lib/date'
 import { useLocale } from '../contexts/LocaleContext'
 import { FlagImg } from './FlagImg'
@@ -13,9 +14,8 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
   onClose: () => void
 }) {
   const { t } = useLocale()
-  const unpredicted = useMemo(
+  const [unpredicted] = useState(
     () => fixtures.filter(f => isBeforeKickoff(f.kickoff_at) && !predictionsByMatch[f.id]),
-    [fixtures, predictionsByMatch],
   )
 
   const [index, setIndex] = useState(0)
@@ -23,7 +23,7 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
   const [localScores, setLocalScores] = useState<Record<number, { home: number | null; away: number | null }>>({})
 
   if (unpredicted.length === 0 || index >= unpredicted.length) {
-    return (
+    return createPortal(
       <div className="h2h-overlay" onClick={onClose}>
         <div className="card predict-all-card" onClick={e => e.stopPropagation()}>
           <h2 style={{ fontFamily: 'var(--font-disp)', fontSize: 24, textTransform: 'uppercase', marginBottom: 8, textAlign: 'center' }}>
@@ -37,7 +37,8 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
           </p>
           <button className="btn btn-primary btn-block" onClick={onClose}>{t('predictAll.close')}</button>
         </div>
-      </div>
+      </div>,
+      document.body,
     )
   }
 
@@ -55,7 +56,7 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
     onScoreChange(fixture.id, home, away)
   }
 
-  return (
+  return createPortal(
     <div className="h2h-overlay" onClick={onClose}>
       <div className="card predict-all-card" onClick={e => e.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -107,6 +108,7 @@ export function PredictAllFlow({ fixtures, predictionsByMatch, onPick, onScoreCh
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
