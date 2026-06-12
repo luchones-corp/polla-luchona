@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Penales — Canvas</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+
+        /* Tres capas superpuestas exactamente */
+        #wrap { position: relative; }
+        #wrap canvas { position: absolute; top: 0; left: 0; display: block; }
+
+        /* Sin blend-mode: los PNGs se procesan en carga para tener
+           transparencia real (flood-fill desde bordes). Si getImageData
+           no está disponible (CORS en file://), se activa screen blend
+           automáticamente como fallback. */
+
+        /* La capa UI recibe todos los eventos de puntero */
+        #uc { cursor: crosshair; }
+    </style>
+</head>
+<body>
+<div id="wrap">
+    <canvas id="bc"></canvas>   <!-- capa 1: fondo -->
+    <canvas id="sc"></canvas>   <!-- capa 2: sprites (screen blend) -->
+    <canvas id="uc"></canvas>   <!-- capa 3: UI + input -->
+</div>
+<script>
+const W = 960, H = 540;
+
+// ── Setup de las tres capas ────────────────────────────────────────────────
+const wrap = document.getElementById('wrap');
+wrap.style.width  = W + 'px';
+wrap.style.height = H + 'px';
+['bc','sc','uc'].forEach(id => {
+    const c = document.getElementById(id);
+    c.width = W; c.height = H;
+});
+const bgCtx  = document.getElementById('bc').getContext('2d');
+const sprCtx = document.getElementById('sc').getContext('2d');
+const uiCtx  = document.getElementById('uc').getContext('2d');
+
+// Escalado responsivo del wrapper
+function resize() {
+    const s = Math.min(innerWidth / W, innerHeight / H);
+    wrap.style.transform       = `scale(${s})`;
+    wrap.style.transformOrigin = 'center center';
+    wrap.style.position        = 'absolute';
+    wrap.style.left            = '50%';
+    wrap.style.top             = '50%';
+    wrap.style.marginLeft      = (-W / 2) + 'px';
+    wrap.style.marginTop       = (-H / 2) + 'px';
+}
+addEventListener('resize', resize); resize();
+
+// ── Layout ─────────────────────────────────────────────────────────────────
+// Ajustar GOAL_CY si el arco no alinea con el suelo del fondo.
+// Base del arco = GOAL_CY + GOAL_H/2 — debe coincidir con la línea de césped.
+const GOAL_W = 600, GOAL_H = 242, GOAL_CX = W / 2, GOAL_CY = 278;
+const AIM = {
+    left:   GOAL_CX - 242,
+    right:  GOAL_CX + 242,
+    top:    GOAL_CY - 80,   // travesaño  ≈ y 148
+    bottom: GOAL_CY + 95,   // línea gol  ≈ y 323
+};
+const KEEPER = { startX: W / 2, y: AIM.bottom, w: 136, h: 180, maxMove: 218 };
+const BALL   = { startX: W / 2, startY: 468, size: 88, endMult: 0.28 };
+const PBAR   = { x: W / 2 - 200, y: H - 38, w: 400, h: 22 };
+
+// ── Carga de imágenes ──────────────────────────────────────────────────────
+const imgs = {};
+let imgLoaded = 0;
+
+// Flood-fill BFS desde los 4 bordes: elimina únicamente los píxeles oscuros
+// conectados al borde (fondo negro), preservando detalles oscuros internos
+// (parches de la pelota, cabello del arquero, etc.).
+// Devuelve un HTMLCanvasElement con alpha real, o null si falla (file:// CORS).
+function stripBlackBg(img, thr) {
+    thr = thr || 28;
+    const c = document.createElement('canvas');
+    c.width  = img.naturalWidth  || img.width;
+    c.height = img.naturalHeight || img.height;
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    let id;
+    try { id = ctx.getImageData(0, 0, c.width, c.height); }
+    catch(_) { return null; }
+    const d = id.data, W = c.width, H = c.height;
+    const vis = new Uint8Array(W * H);
+    const q = [];
+    const dark = function(x, y) { var i=(y*W+x)*4; return d[i]<thr && d[i+1]<thr && d[i+2]<thr; };
+    const push = function(x, y) { var n=y*W+x; if(!vis[n]&&dark(x,y)){vis[n]=1;q.push(x,y);} };
+    for (var x=0; x<W; x++) { push(x,0); push(x,H-1); }
+    for (var y=1; y<H-1; y++) { push(0,y); push(W-1,y); }
+    for (var i=0; i<q.length; i+=2) {
+        var qx=q[i], qy=q[i+1];
+        d[(qy*W+qx)*4+3] = 0;
+        if(qx>0)   push(qx-1, qy);
+        if(qx<W-1) push(qx+1, qy);
+        if(qy>0)   push(qx, qy-1);
+        if(qy<H-1) push(qx, qy+1);
+    }
+    ctx.putImageData(id, 0, 0);
+    return c;
+}
+
+[['bg','fondo.jpeg'],['goal','arco.png'],['idle','arquero_parado.png'],
+ ['jump','arquero_saltando.png'],['ball','pelota.png']].forEach(([k, src]) => {
+    const img = new Image();
+    img.onload = function() {
+        if (src.endsWith('.png')) {
+            var proc = stripBlackBg(img);
+            imgs[k] = proc || img;
+            if (!proc) document.getElementById('sc').style.mixBlendMode = 'screen';
+        } else {
+            imgs[k] = img;
+        }
+        imgLoaded++;
+    };
+    img.src = src;
+});
+
+// ── Tweens ─────────────────────────────────────────────────────────────────
+const EASE = {
+    linear:    t => t,
+    cubicIn:   t => t * t * t,
+    power2Out: t => 1 - (1 - t) * (1 - t),
+    sineInOut: t => -(Math.cos(Math.PI * t) - 1) / 2,
+    backOut:   t => { const c = 1.70158; return 1 + (c+1)*Math.pow(t-1,3) + c*Math.pow(t-1,2); },
+};
+let tweens = [];
+function addTween(target, to, duration, easeName, delay, onComplete) {
+    const from = {};
+    for (const k in to) from[k] = target[k] ?? 0;
+    tweens.push({ target, from, to, duration, ease: EASE[easeName] || EASE.linear,
+        elapsed: 0, delay: delay || 0, delayGone: 0, onComplete, done: false });
+}
+function killTweens(target) { tweens = tweens.filter(t => t.target !== target); }
+function stepTweens(dt) {
+    for (const t of tweens) {
+        if (t.done) continue;
+        if (t.delayGone < t.delay) { t.delayGone += dt; continue; }
+        t.elapsed += dt;
+        const p = t.ease(Math.min(t.elapsed / t.duration, 1));
+        for (const k in t.to) t.target[k] = t.from[k] + (t.to[k] - t.from[k]) * p;
+        if (t.elapsed >= t.duration) { t.done = true; t.onComplete?.(); }
+    }
+    tweens = tweens.filter(t => !t.done);
+}
+
+// ── Estado ─────────────────────────────────────────────────────────────────
+let gState = 'LOADING';
+let gols = 0, atajadas = 0;
+let power = 0, powerDir = 1;
+let aimX = GOAL_CX, aimY = (AIM.top + AIM.bottom) / 2;
+let bobTimer = 0;
+let ballS, keeperS, resultS;
+let keeperTex = 'idle', keeperFlip = false;
+let resultMsg = '', resultColor = '#fff';
+let shakeX = 0, shakeY = 0, shakeTime = 0, shakeAmp = 0;
+let flashR = 0, flashG = 0, flashB = 0, flashAlpha = 0, flashDecay = 0;
+
+function initRound() {
+    ballS   = { x: BALL.startX, y: BALL.startY, w: BALL.size, h: BALL.size, angle: 0 };
+    keeperS = { x: KEEPER.startX };
+    keeperTex = 'idle'; keeperFlip = false;
+    aimX = GOAL_CX; aimY = (AIM.top + AIM.bottom) / 2;
+    bobTimer = 0;
+    gState = 'AIMING';
+}
+
+// ── Entrada (eventos en #uc, la capa superior) ─────────────────────────────
+const ucEl = document.getElementById('uc');
+function gamePos(e) {
+    const r = ucEl.getBoundingClientRect();
+    const c = e.touches ? e.touches[0] : e;
+    return { x: (c.clientX - r.left) * (W / r.width), y: (c.clientY - r.top) * (H / r.height) };
+}
+function clampAim(p) {
+    aimX = Math.max(AIM.left, Math.min(AIM.right,  p.x));
+    aimY = Math.max(AIM.top,  Math.min(AIM.bottom, p.y));
+}
+ucEl.addEventListener('mousemove', e => { if (gState === 'AIMING') clampAim(gamePos(e)); });
+ucEl.addEventListener('mousedown', () => {
+    if (gState !== 'AIMING') return;
+    gState = 'CHARGING'; power = 0; powerDir = 1;
+});
+ucEl.addEventListener('mouseup', () => {
+    if (gState !== 'CHARGING') return;
+    gState = 'SHOOTING'; shoot();
+});
+ucEl.addEventListener('touchmove',  e => { e.preventDefault(); if (gState === 'AIMING') clampAim(gamePos(e)); }, { passive: false });
+ucEl.addEventListener('touchstart', e => { e.preventDefault(); clampAim(gamePos(e));
+    if (gState !== 'AIMING') return;
+    gState = 'CHARGING'; power = 0; powerDir = 1;
+}, { passive: false });
+ucEl.addEventListener('touchend', e => { e.preventDefault();
+    if (gState !== 'CHARGING') return;
+    gState = 'SHOOTING'; shoot();
+}, { passive: false });
+
+// ── Lógica ─────────────────────────────────────────────────────────────────
+function shoot() {
+    const tx = aimX, ty = aimY;
+    const dur = 980 - (980 - 360) * (power / 100);
+    const endSz = BALL.size * BALL.endMult;
+    addTween(ballS, { x: tx, y: ty, w: endSz, h: endSz, angle: 660 }, dur, 'cubicIn', 0,
+        () => evaluate(tx, ty));
+    keeperReact(tx, dur);
+}
+
+function keeperReact(targetX, shotDur) {
+    const norm = (targetX - GOAL_CX) / ((AIM.right - AIM.left) / 2);
+    let dir = Math.sign(norm);
+    if (Math.abs(norm) < 0.18) dir = Math.round(Math.random() * 2) - 1;
+    if (Math.random() < 0.28)  dir = -dir;
+    const move  = KEEPER.maxMove * Math.min(Math.abs(norm) * 1.45, 1);
+    const destX = GOAL_CX + dir * Math.max(move, KEEPER.maxMove * 0.3);
+    const delay = 110 + Math.random() * 160;
+    keeperTex = 'jump'; keeperFlip = dir < 0;
+    addTween(keeperS, { x: destX }, shotDur * 0.85, 'power2Out', delay, null);
+}
+
+function evaluate(tx, ty) {
+    const dist   = Math.abs(keeperS.x - tx);
+    const isHigh = ty < AIM.top + (AIM.bottom - AIM.top) * 0.38;
+    const reach  = KEEPER.w * 0.52;
+    const saved  = isHigh ? dist < reach * 0.6 : dist < reach;
+    if (saved) { atajadas++; startFlash(255,60,60);            showResult('¡ATAJADA!', '#ff5555'); }
+    else       { gols++;     startShake(220,0.008); startFlash(80,255,120); showResult('¡GOL!', '#55ffaa'); }
+}
+
+function showResult(msg, color) {
+    gState = 'RESULT';
+    resultMsg = msg; resultColor = color;
+    resultS = { alpha: 0, scale: 0.4 };
+    addTween(resultS, { alpha: 1, scale: 1 }, 370, 'backOut', 0, () =>
+        setTimeout(() =>
+            addTween(resultS, { alpha: 0 }, 260, 'linear', 0, () => {
+                killTweens(ballS); killTweens(keeperS); killTweens(resultS);
+                initRound();
+            })
+        , 1450)
+    );
+}
+
+function startFlash(r, g, b) { flashR=r; flashG=g; flashB=b; flashAlpha=0.6; flashDecay=0.6/12; }
+function startShake(ms, amp) { shakeTime=ms; shakeAmp=amp; }
+
+// ── Update ─────────────────────────────────────────────────────────────────
+function update(dt) {
+    if (gState === 'LOADING' && imgLoaded === 5) initRound();
+    stepTweens(dt);
+    if (gState === 'CHARGING') {
+        power += powerDir * 1.5 * (dt / 16.67);
+        if (power >= 100) { power = 100; powerDir = -1; }
+        if (power <= 0)   { power = 0;   powerDir =  1; }
+    }
+    if (gState === 'AIMING') {
+        bobTimer += dt;
+        ballS.y = BALL.startY - 5 * (1 - Math.cos(2 * Math.PI * bobTimer / 860));
+    }
+    if (flashAlpha > 0) flashAlpha = Math.max(0, flashAlpha - flashDecay * (dt / 16.67));
+    if (shakeTime  > 0) {
+        shakeTime -= dt;
+        shakeX = (Math.random() - 0.5) * shakeAmp * 20;
+        shakeY = (Math.random() - 0.5) * shakeAmp * 20;
+    } else { shakeX = 0; shakeY = 0; }
+}
+
+// ── Helpers de dibujo ──────────────────────────────────────────────────────
+function roundRect(cx, x, y, w, h, r) {
+    r = Math.min(r, w / 2, h / 2);
+    cx.beginPath();
+    cx.moveTo(x+r, y);
+    cx.lineTo(x+w-r, y);   cx.arcTo(x+w, y,     x+w, y+r,     r);
+    cx.lineTo(x+w, y+h-r); cx.arcTo(x+w, y+h,   x+w-r, y+h,   r);
+    cx.lineTo(x+r, y+h);   cx.arcTo(x,   y+h,   x,     y+h-r, r);
+    cx.lineTo(x, y+r);     cx.arcTo(x,   y,     x+r,   y,     r);
+    cx.closePath();
+}
+
+// Dibuja un sprite en sprCtx (capa de screen blend por CSS).
+// No se necesita globalCompositeOperation — el CSS #sc{mix-blend-mode:screen}
+// elimina los fondos negros automáticamente en todos los navegadores modernos.
+function drawSprite(key, x, y, w, h, angle, flipX, originY) {
+    const src = imgs[key];
+    if (!src) return;
+    sprCtx.save();
+    sprCtx.translate(x, y);
+    if (flipX) sprCtx.scale(-1, 1);
+    if (angle) sprCtx.rotate(angle * Math.PI / 180);
+    sprCtx.drawImage(src, -w / 2, -h * (originY ?? 0.5), w, h);
+    sprCtx.restore();
+}
+
+function drawText(text, x, y, size, color, stroke, sw) {
+    uiCtx.save();
+    uiCtx.font = `900 ${size}px Arial, sans-serif`;
+    uiCtx.textAlign = 'center'; uiCtx.textBaseline = 'middle';
+    if (stroke) { uiCtx.lineWidth = sw || 4; uiCtx.strokeStyle = stroke; uiCtx.strokeText(text, x, y); }
+    uiCtx.fillStyle = color; uiCtx.fillText(text, x, y);
+    uiCtx.restore();
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+    bgCtx.clearRect(0, 0, W, H);
+    sprCtx.clearRect(0, 0, W, H);
+    uiCtx.clearRect(0, 0, W, H);
+
+    if (gState === 'LOADING') {
+        bgCtx.fillStyle = '#111'; bgCtx.fillRect(0, 0, W, H);
+        bgCtx.font = '900 24px Arial'; bgCtx.textAlign = 'center'; bgCtx.textBaseline = 'middle';
+        bgCtx.fillStyle = '#fff'; bgCtx.fillText('Cargando…', W/2, H/2);
+        return;
+    }
+
+    // ── Capa 1: fondo ──────────────────────────────────────────────────────
+    bgCtx.drawImage(imgs.bg, 0, 0, W, H);
+
+    // ── Capa 2: sprites con shake (CSS screen blend quita el fondo negro) ──
+    sprCtx.save();
+    sprCtx.translate(shakeX, shakeY);
+    drawSprite('goal',    GOAL_CX,   GOAL_CY,  GOAL_W, GOAL_H, 0,          false,      0.5);
+    drawSprite(keeperTex, keeperS.x, KEEPER.y, KEEPER.w, KEEPER.h, 0,     keeperFlip, 1);
+    drawSprite('ball',    ballS.x,   ballS.y,  ballS.w, ballS.h,  ballS.angle, false, 0.5);
+    sprCtx.restore();
+
+    // ── Capa 3: UI (sin blend, sobre todo lo demás) ────────────────────────
+
+    // Línea guía punteada
+    if (gState === 'AIMING' || gState === 'CHARGING') {
+        uiCtx.save();
+        uiCtx.strokeStyle = 'rgba(255,255,255,0.25)';
+        uiCtx.lineWidth = 1.5; uiCtx.setLineDash([7, 9]);
+        uiCtx.beginPath();
+        uiCtx.moveTo(BALL.startX, BALL.startY - BALL.size / 2 + 4);
+        uiCtx.lineTo(aimX, aimY + 18);
+        uiCtx.stroke(); uiCtx.setLineDash([]);
+        uiCtx.restore();
+    }
+
+    // Mira
+    if (gState === 'AIMING' || gState === 'CHARGING') {
+        const x = aimX, y = aimY;
+        uiCtx.save();
+        uiCtx.strokeStyle = 'rgba(0,0,0,0.35)'; uiCtx.lineWidth = 3;
+        uiCtx.beginPath(); uiCtx.arc(x+1, y+1, 22, 0, Math.PI*2); uiCtx.stroke();
+        uiCtx.strokeStyle = 'rgba(255,255,255,0.8)'; uiCtx.lineWidth = 2;
+        uiCtx.beginPath(); uiCtx.arc(x, y, 22, 0, Math.PI*2); uiCtx.stroke();
+        uiCtx.strokeStyle = 'rgba(255,255,255,0.45)'; uiCtx.lineWidth = 1;
+        uiCtx.beginPath(); uiCtx.arc(x, y, 9, 0, Math.PI*2); uiCtx.stroke();
+        uiCtx.fillStyle = '#ff2222';
+        uiCtx.beginPath(); uiCtx.arc(x, y, 4, 0, Math.PI*2); uiCtx.fill();
+        uiCtx.strokeStyle = 'rgba(255,255,255,0.65)'; uiCtx.lineWidth = 1.5;
+        [[x-36,y,x-16,y],[x+16,y,x+36,y],[x,y-36,x,y-16],[x,y+16,x,y+36]]
+            .forEach(([x1,y1,x2,y2]) => {
+                uiCtx.beginPath(); uiCtx.moveTo(x1,y1); uiCtx.lineTo(x2,y2); uiCtx.stroke();
+            });
+        uiCtx.restore();
+    }
+
+    // Barra de potencia
+    if (gState === 'CHARGING') {
+        const pct  = power / 100;
+        const fill = Math.max(6, PBAR.w * pct);
+        const col  = pct < 0.42 ? '#22cc44' : pct < 0.76 ? '#ffcc00' : '#ff3300';
+        uiCtx.save();
+        uiCtx.fillStyle = 'rgba(0,0,0,0.78)';
+        roundRect(uiCtx, PBAR.x-3, PBAR.y-24, PBAR.w+6, PBAR.h+28, 9); uiCtx.fill();
+        uiCtx.fillStyle = '#1c1c1c';
+        roundRect(uiCtx, PBAR.x, PBAR.y, PBAR.w, PBAR.h, 5); uiCtx.fill();
+        uiCtx.fillStyle = col;
+        roundRect(uiCtx, PBAR.x, PBAR.y, fill, PBAR.h, Math.min(5, fill/2)); uiCtx.fill();
+        uiCtx.restore();
+        drawText('POTENCIA', W/2, PBAR.y-13, 11, '#fff', '#000', 3);
+    }
+
+    // Marcador
+    uiCtx.fillStyle = 'rgba(0,0,0,0.55)';
+    roundRect(uiCtx, W/2-145, 4, 290, 30, 8); uiCtx.fill();
+    drawText(`Goles: ${gols}   |   Atajadas: ${atajadas}`, W/2, 19, 15, '#fff', '#000', 3);
+
+    // Instrucción
+    if (gState === 'AIMING') {
+        drawText('Apunta al arco  ·  Mantén clic para cargar  ·  Suelta para disparar',
+            W/2, H-13, 12, 'rgba(255,255,255,0.67)', '#000', 2);
+    }
+
+    // Texto resultado
+    if (gState === 'RESULT' && resultS?.alpha > 0) {
+        uiCtx.save();
+        uiCtx.globalAlpha = resultS.alpha;
+        uiCtx.translate(W/2, H/2-15);
+        uiCtx.scale(resultS.scale, resultS.scale);
+        uiCtx.font = '900 84px Arial, sans-serif';
+        uiCtx.textAlign = 'center'; uiCtx.textBaseline = 'middle';
+        uiCtx.lineWidth = 8; uiCtx.strokeStyle = '#000'; uiCtx.strokeText(resultMsg, 0, 0);
+        uiCtx.fillStyle = resultColor; uiCtx.fillText(resultMsg, 0, 0);
+        uiCtx.restore();
+    }
+
+    // Flash de cámara
+    if (flashAlpha > 0) {
+        uiCtx.fillStyle = `rgba(${flashR},${flashG},${flashB},${flashAlpha.toFixed(3)})`;
+        uiCtx.fillRect(0, 0, W, H);
+    }
+}
+
+// ── Loop ───────────────────────────────────────────────────────────────────
+let lastT = 0;
+function loop(ts) {
+    const dt = Math.min(ts - lastT, 50);
+    lastT = ts;
+    update(dt); render();
+    requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

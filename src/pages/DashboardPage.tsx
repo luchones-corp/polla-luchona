@@ -382,6 +382,21 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
             </button>
           </nav>
           <div className="topbar-right">
+            <a
+              href="/games/penales/canvas.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-ghost btn-sm"
+              title={t('dash.penales')}
+            >
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" aria-label={t('dash.penales')}>
+                <rect x="2" y="6" width="20" height="12" rx="4" />
+                <circle cx="9" cy="12" r="2" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="10" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="17" cy="12" r="1.2" fill="currentColor" stroke="none" />
+                <circle cx="15" cy="14" r="1.2" fill="currentColor" stroke="none" />
+              </svg>
+            </a>
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => setLocale(locale === 'es' ? 'en' : 'es')}

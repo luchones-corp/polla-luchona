@@ -55,7 +55,7 @@ function ScoreStepper({ value, onChange, disabled }: {
   )
 }
 
-export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreChange, groupId, userId, reactions, lockMinutesBefore = 0 }: {
+export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreChange, groupId, userId, reactions, lockMinutesBefore = 0, hideGroupTag = false }: {
   fixture: Fixture
   prediction?: Prediction
   groupPicks?: GroupPrediction[]
@@ -65,6 +65,7 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
   userId?: string
   reactions?: ReactionSummary[]
   lockMinutesBefore?: number
+  hideGroupTag?: boolean
 }) {
   const { t } = useLocale()
   const [showReveals, setShowReveals] = useState(false)
@@ -108,7 +109,7 @@ export function FixtureCard({ fixture, prediction, groupPicks, onPick, onScoreCh
       {/* header */}
       <div className="mc-head" onClick={isFinished ? () => setCollapsed(c => !c) : undefined} style={isFinished ? { cursor: 'pointer' } : undefined}>
         <span className="mc-grp">
-          {fixture.stage === 'group' && fixture.group_label && (
+          {!hideGroupTag && fixture.stage === 'group' && fixture.group_label && (
             <><span className="mc-gtag">{t('partidos.groupLabel')} {fixture.group_label}</span><span className="mc-dot" /></>
           )}
           {fixture.stage === 'group' ? t('fx.groupStage') : fixture.stage.toUpperCase()}

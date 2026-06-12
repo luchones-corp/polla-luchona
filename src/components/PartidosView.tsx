@@ -211,7 +211,7 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
               </div>
             )}
             {section.fixtures.map(f => (
-              <FixtureCard key={f.id} fixture={f} prediction={predictionsByMatch[f.id]} groupPicks={groupPredictionsByMatch[f.id]} onPick={onPick} onScoreChange={onScoreChange} groupId={groupId} userId={userId} reactions={reactionsByMatch?.[f.id]} lockMinutesBefore={lockMinutesBefore} />
+              <FixtureCard key={f.id} fixture={f} prediction={predictionsByMatch[f.id]} groupPicks={groupPredictionsByMatch[f.id]} onPick={onPick} onScoreChange={onScoreChange} groupId={groupId} userId={userId} reactions={reactionsByMatch?.[f.id]} lockMinutesBefore={lockMinutesBefore} hideGroupTag={!!section.label} />
             ))}
           </div>
         ))}

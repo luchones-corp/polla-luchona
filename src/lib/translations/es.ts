@@ -68,6 +68,7 @@ export const es: Record<string, string> = {
   'dash.lightMode': 'Modo claro',
   'dash.darkMode': 'Modo oscuro',
   'dash.logout': 'Cerrar sesion',
+  'dash.penales': 'Jugar Penales',
   'dash.pwaBanner': 'Instala La Polla en tu dispositivo para acceso rapido.',
   'dash.install': 'Instalar',
 
