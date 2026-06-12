@@ -194,6 +194,15 @@ export const en: Record<string, string> = {
   'grupo.archiving': 'Archiving...',
   'grupo.archiveBtn': 'Archive season',
   'grupo.viewArchive': 'View archive',
+  'grupo.closedTag': 'Closed',
+  'grupo.closedLabel': 'Group closed',
+  'grupo.closedDesc': 'No one else can join with the link.',
+  'grupo.openLabel': 'Group open',
+  'grupo.openDesc': 'Anyone with the link can join.',
+  'grupo.closeBtn': 'Close group',
+  'grupo.reopenBtn': 'Reopen group',
+  'grupo.closed': 'Group closed',
+  'grupo.reopened': 'Group reopened',
 
   // Chat
   'chat.heading': 'Chat',
@@ -287,6 +296,8 @@ export const en: Record<string, string> = {
   'join.success': 'Done! You are now a member of the group.',
   'join.goToDash': 'Go to dashboard',
   'join.afterSetup': 'Then you can join',
+  'join.closed': 'This group is closed and is not accepting new members.',
+  'join.closedBtn': 'Group closed',
 
   // App
   'app.configPending': 'Configuration pending',

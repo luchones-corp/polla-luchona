@@ -49,14 +49,23 @@ export async function createGroup(name: string): Promise<Group> {
 export async function getGroupsForUser(user: User): Promise<Group[]> {
   const { data, error } = await supabase
     .from('group_members')
-    .select('groups!inner(id, name, owner_id, invite_token, lock_minutes_before)')
+    .select('groups!inner(id, name, owner_id, invite_token, lock_minutes_before, is_closed)')
     .eq('user_id', user.id)
 
   if (!error) {
     return (data ?? []).map((row: any) => row.groups as Group)
   }
 
-  // Fallback: lock_minutes_before column may not exist yet (migration 010)
+  // Fallback: is_closed (migration 019) or lock_minutes_before (migration 010) may not exist yet
+  const { data: lockOnly, error: lockOnlyError } = await supabase
+    .from('group_members')
+    .select('groups!inner(id, name, owner_id, invite_token, lock_minutes_before)')
+    .eq('user_id', user.id)
+
+  if (!lockOnlyError) {
+    return (lockOnly ?? []).map((row: any) => ({ ...row.groups, is_closed: false } as Group))
+  }
+
   const { data: fallback, error: fallbackError } = await supabase
     .from('group_members')
     .select('groups!inner(id, name, owner_id, invite_token)')
@@ -67,14 +76,16 @@ export async function getGroupsForUser(user: User): Promise<Group[]> {
   return (fallback ?? []).map((row: any) => ({
     ...row.groups,
     lock_minutes_before: 0,
+    is_closed: false,
   } as Group))
 }
 
-export async function getGroupByInviteToken(token: string): Promise<Pick<Group, 'id' | 'name' | 'owner_id'> | null> {
+export async function getGroupByInviteToken(token: string): Promise<Pick<Group, 'id' | 'name' | 'owner_id' | 'is_closed'> | null> {
   const { data, error } = await supabase.rpc('get_group_by_invite_token', { token })
   if (error) throw error
   if (!data || data.length === 0) return null
-  return data[0]
+  const row = data[0]
+  return { ...row, is_closed: row.is_closed ?? false }
 }
 
 export async function joinGroupByToken(token: string): Promise<string> {
@@ -167,32 +178,20 @@ export async function getFixtures(): Promise<Fixture[]> {
   }))
 }
 
-export async function getUserPredictions(userId: string): Promise<Prediction[]> {
+export async function getUserPredictions(userId: string, groupId: string): Promise<Prediction[]> {
   const { data, error } = await supabase
     .from('predictions')
-    .select('id, match_id, pick, score_home, score_away, updated_at')
+    .select('id, match_id, group_id, pick, score_home, score_away, updated_at')
     .eq('user_id', userId)
+    .eq('group_id', groupId)
 
-  if (!error) {
-    return (data ?? []) as Prediction[]
-  }
-
-  // Fallback: score columns may not exist yet (migration 005)
-  const { data: fallback, error: fallbackError } = await supabase
-    .from('predictions')
-    .select('id, match_id, pick, updated_at')
-    .eq('user_id', userId)
-
-  if (fallbackError) throw fallbackError
-  return (fallback ?? []).map((row: any) => ({
-    ...row,
-    score_home: null,
-    score_away: null,
-  } as Prediction))
+  if (error) throw error
+  return (data ?? []) as Prediction[]
 }
 
 export async function savePrediction(
   userId: string,
+  groupId: string,
   matchId: number,
   pick: MatchPick,
   scoreHome: number | null = null,
@@ -201,21 +200,11 @@ export async function savePrediction(
   const { error } = await supabase
     .from('predictions')
     .upsert(
-      { user_id: userId, match_id: matchId, pick, score_home: scoreHome, score_away: scoreAway },
-      { onConflict: 'user_id,match_id' },
+      { user_id: userId, group_id: groupId, match_id: matchId, pick, score_home: scoreHome, score_away: scoreAway },
+      { onConflict: 'user_id,group_id,match_id' },
     )
 
-  if (!error) return
-
-  // Fallback: score columns may not exist yet (migration 005)
-  const { error: fallbackError } = await supabase
-    .from('predictions')
-    .upsert(
-      { user_id: userId, match_id: matchId, pick },
-      { onConflict: 'user_id,match_id' },
-    )
-
-  if (fallbackError) throw fallbackError
+  if (error) throw error
 }
 
 export async function getGroupPredictions(groupId: string): Promise<GroupPrediction[]> {
@@ -303,6 +292,7 @@ export async function getPublicUserPredictions(userId: string, groupId: string):
   return (data ?? []).map((row: any) => ({
     id: `public-${row.match_id}`,
     match_id: row.match_id,
+    group_id: groupId,
     pick: row.pick,
     score_home: row.score_home,
     score_away: row.score_away,
@@ -396,6 +386,11 @@ export async function updateGroupName(groupId: string, name: string): Promise<vo
     .from('groups')
     .update({ name })
     .eq('id', groupId)
+  if (error) throw error
+}
+
+export async function setGroupClosed(groupId: string, closed: boolean): Promise<void> {
+  const { error } = await supabase.rpc('set_group_closed', { target_group_id: groupId, closed })
   if (error) throw error
 }
 

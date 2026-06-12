@@ -6,6 +6,7 @@ export type Group = {
   owner_id: string
   invite_token: string
   lock_minutes_before: number
+  is_closed: boolean
 }
 
 export type GroupMember = {
@@ -33,6 +34,7 @@ export type Fixture = {
 export type Prediction = {
   id: string
   match_id: number
+  group_id: string
   pick: MatchPick
   score_home: number | null
   score_away: number | null

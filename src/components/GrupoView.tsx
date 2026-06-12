@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js'
 import { Avatar } from './Avatar'
 import { GroupChat } from './GroupChat'
 import { ICONS } from './Icons'
-import { updateGroupLockMinutes, updateGroupName } from '../lib/api'
+import { setGroupClosed, updateGroupLockMinutes, updateGroupName } from '../lib/api'
 import { useLocale } from '../contexts/LocaleContext'
 import type { Group, GroupMember } from '../lib/types'
 
@@ -67,12 +67,23 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
             </div>
           </div>
           <p>{t('grupo.shareDesc')}</p>
+          {selectedGroup.is_closed && (
+            <p style={{ color: 'var(--ink-2)', fontSize: 13, marginTop: 6 }}>
+              <span className="chip" style={{ marginRight: 6 }}>{t('grupo.closedTag')}</span>
+              {t('grupo.closedDesc')}
+            </p>
+          )}
           <div className="share-row">
-            <button className="btn btn-primary btn-sm" onClick={() => { navigator.clipboard.writeText(inviteLink); toast(t('grupo.linkCopied')) }}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => { navigator.clipboard.writeText(inviteLink); toast(t('grupo.linkCopied')) }}
+              disabled={selectedGroup.is_closed}
+              title={selectedGroup.is_closed ? t('grupo.closedDesc') : undefined}
+            >
               {ICONS.copy} {t('grupo.copyLink')}
             </button>
             {isOwner && (
-              <button className="btn btn-dark btn-sm" onClick={onRegenerateInvite}>
+              <button className="btn btn-dark btn-sm" onClick={onRegenerateInvite} disabled={selectedGroup.is_closed}>
                 {ICONS.regen} {t('grupo.regenerate')}
               </button>
             )}
@@ -163,6 +174,30 @@ export function GrupoView({ selectedGroup, isOwner, members, session, onRegenera
                 <option key={o.value} value={o.value}>{o.label}</option>
               ))}
             </select>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginTop: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--ink-2)', fontWeight: 600 }}>
+                {selectedGroup.is_closed ? t('grupo.closedLabel') : t('grupo.openLabel')}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+                {selectedGroup.is_closed ? t('grupo.closedDesc') : t('grupo.openDesc')}
+              </div>
+            </div>
+            <button
+              className={'btn btn-sm ' + (selectedGroup.is_closed ? 'btn-primary' : 'btn-dark')}
+              onClick={async () => {
+                try {
+                  await setGroupClosed(selectedGroup.id, !selectedGroup.is_closed)
+                  toast(selectedGroup.is_closed ? t('grupo.reopened') : t('grupo.closed'))
+                  onGroupUpdated?.()
+                } catch {
+                  toast(t('grupo.settingsError'))
+                }
+              }}
+            >
+              {selectedGroup.is_closed ? t('grupo.reopenBtn') : t('grupo.closeBtn')}
+            </button>
           </div>
           {members.length === 1 && (
             <button className="btn btn-danger btn-sm" style={{ marginTop: 16, width: '100%' }} onClick={onDeleteGroup}>

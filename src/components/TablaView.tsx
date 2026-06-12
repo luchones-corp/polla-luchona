@@ -59,7 +59,7 @@ export function TablaView({ rankedStandings, userId, fixtures, groupPredictions,
       const memberPreds: Record<number, Prediction> = {}
       for (const gp of groupPredictions) {
         if (gp.user_id === uid) {
-          memberPreds[gp.match_id] = { id: 'x', match_id: gp.match_id, pick: gp.pick as MatchPick, score_home: gp.score_home, score_away: gp.score_away, updated_at: '' }
+          memberPreds[gp.match_id] = { id: 'x', match_id: gp.match_id, group_id: groupId ?? '', pick: gp.pick as MatchPick, score_home: gp.score_home, score_away: gp.score_away, updated_at: '' }
         }
       }
       const { current } = computeStreak(fixtures, memberPreds)

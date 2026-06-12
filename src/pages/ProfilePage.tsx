@@ -39,7 +39,7 @@ export function ProfilePage({ session, groupId }: ProfilePageProps) {
           getUserProfile(userId!),
           getFixtures(),
           isOwn
-            ? getUserPredictions(userId!)
+            ? (groupId ? getUserPredictions(userId!, groupId) : Promise.resolve([]))
             : groupId
               ? getPublicUserPredictions(userId!, groupId)
               : Promise.resolve([]),

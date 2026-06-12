@@ -101,15 +101,12 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     setLoading(true)
     setError(null)
     try {
-      const [nextGroups, nextFixtures, nextPredictions] = await Promise.all([
+      const [nextGroups, nextFixtures] = await Promise.all([
         getGroupsForUser(session.user),
         getFixtures(),
-        getUserPredictions(session.user.id),
       ])
-      const predictionMap = nextPredictions.reduce<Record<number, Prediction>>((acc, p) => { acc[p.match_id] = p; return acc }, {})
       setGroups(nextGroups)
       setFixtures(nextFixtures)
-      setPredictionsByMatch(predictionMap)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.loadError'))
     } finally {
@@ -131,22 +128,30 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   }, [groups, selectedGroupId])
 
   useEffect(() => {
-    if (!selectedGroupId) { setMembers([]); setStandings([]); setGroupPredictions([]); setReactionsByMatch({}); return }
+    if (!selectedGroupId) {
+      setMembers([]); setStandings([]); setGroupPredictions([]); setReactionsByMatch({}); setPredictionsByMatch({})
+      return
+    }
     const groupId = selectedGroupId
     let mounted = true
+    // Clear stale per-group predictions while we fetch fresh ones
+    setPredictionsByMatch({})
     async function loadGroupData() {
       try {
-        const [nextMembers, nextStandings, nextGroupPredictions, nextReactions] = await Promise.all([
+        const [nextMembers, nextStandings, nextGroupPredictions, nextReactions, nextPredictions] = await Promise.all([
           getGroupMembers(groupId),
           getStandings(groupId),
           getGroupPredictions(groupId),
           getGroupReactions(groupId),
+          getUserPredictions(session.user.id, groupId),
         ])
         if (!mounted) return
         setMembers(nextMembers)
         setStandings(nextStandings)
         setGroupPredictions(nextGroupPredictions)
         setReactionsByMatch(nextReactions)
+        const predictionMap = nextPredictions.reduce<Record<number, Prediction>>((acc, p) => { acc[p.match_id] = p; return acc }, {})
+        setPredictionsByMatch(predictionMap)
       } catch (caughtError) {
         if (!mounted) return
         setError(caughtError instanceof Error ? caughtError.message : t('dash.groupError'))
@@ -154,7 +159,7 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
     }
     void loadGroupData()
     return () => { mounted = false }
-  }, [selectedGroupId])
+  }, [selectedGroupId, session.user.id])
 
   async function handleCreateGroup(event: FormEvent) {
     event.preventDefault()
@@ -167,6 +172,8 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       setShowCreateGroup(false)
       await reloadBaseData()
       setSelectedGroupId(created.id)
+      setView('partidos')
+      window.scrollTo({ top: 0 })
       showToast(t('dash.groupCreated'))
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.createError'))
@@ -200,17 +207,20 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   }
 
   async function handlePick(matchId: number, pick: MatchPick) {
+    if (!selectedGroupId) return
     setError(null)
     // Cancel any pending score save — manual pick takes priority
     clearTimeout(scoreTimers.current[matchId])
+    const groupId = selectedGroupId
     try {
       // Clear scores: manual row tap = "just winner" mode
-      await savePrediction(session.user.id, matchId, pick, null, null)
+      await savePrediction(session.user.id, groupId, matchId, pick, null, null)
       setPredictionsByMatch(current => ({
         ...current,
         [matchId]: {
           id: current[matchId]?.id ?? `local-${matchId}`,
           match_id: matchId,
+          group_id: groupId,
           pick,
           score_home: null,
           score_away: null,
@@ -218,10 +228,8 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
         },
       }))
       showToast(t('dash.predSaved'))
-      if (selectedGroupId) {
-        const refreshedStandings = await getStandings(selectedGroupId)
-        setStandings(refreshedStandings)
-      }
+      const refreshedStandings = await getStandings(groupId)
+      setStandings(refreshedStandings)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.predError'))
     }
@@ -230,19 +238,22 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
   const scoreTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
 
   const saveScore = useCallback(async (matchId: number, scoreHome: number | null, scoreAway: number | null) => {
+    if (!selectedGroupId) return
     const existing = predictionsByMatch[matchId]
     const pick = scoreHome !== null && scoreAway !== null
       ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
       : existing?.pick
     if (!pick) return
     setError(null)
+    const groupId = selectedGroupId
     try {
-      await savePrediction(session.user.id, matchId, pick, scoreHome, scoreAway)
+      await savePrediction(session.user.id, groupId, matchId, pick, scoreHome, scoreAway)
       setPredictionsByMatch(current => ({
         ...current,
         [matchId]: {
           id: current[matchId]?.id ?? `local-${matchId}`,
           match_id: matchId,
+          group_id: groupId,
           pick,
           score_home: scoreHome,
           score_away: scoreAway,
@@ -252,22 +263,22 @@ export function DashboardPage({ session, displayName }: DashboardPageProps) {
       if (scoreHome !== null && scoreAway !== null) {
         showToast(t('dash.scoreSaved'))
       }
-      if (selectedGroupId) {
-        const refreshedStandings = await getStandings(selectedGroupId)
-        setStandings(refreshedStandings)
-      }
+      const refreshedStandings = await getStandings(groupId)
+      setStandings(refreshedStandings)
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : t('dash.predError'))
     }
   }, [predictionsByMatch, session.user.id, selectedGroupId])
 
   function handleScoreChange(matchId: number, scoreHome: number | null, scoreAway: number | null) {
+    if (!selectedGroupId) return
     // Update UI immediately
     setPredictionsByMatch(current => ({
       ...current,
       [matchId]: {
         id: current[matchId]?.id ?? `local-${matchId}`,
         match_id: matchId,
+        group_id: selectedGroupId,
         pick: current[matchId]?.pick ?? (scoreHome !== null && scoreAway !== null
           ? (scoreHome > scoreAway ? 'HOME' : scoreHome < scoreAway ? 'AWAY' : 'DRAW') as MatchPick
           : 'HOME'),

@@ -15,6 +15,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
   const { t } = useLocale()
   const [groupName, setGroupName] = useState<string | null>(null)
   const [groupId, setGroupId] = useState<string | null>(null)
+  const [isClosed, setIsClosed] = useState(false)
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -42,6 +43,7 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
         } else {
           setGroupName(group.name)
           setGroupId(group.id)
+          setIsClosed(group.is_closed)
         }
         setDisplayName(name)
       } catch (caughtError) {
@@ -63,7 +65,8 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
       await joinGroupByToken(token)
       setJoined(true)
     } catch (caughtError) {
-      const message = caughtError instanceof Error ? caughtError.message : t('join.joinError')
+      const raw = caughtError instanceof Error ? caughtError.message : ''
+      const message = raw.includes('GROUP_CLOSED') ? t('join.closed') : (raw || t('join.joinError'))
       setError(message)
     }
   }
@@ -142,13 +145,20 @@ export function JoinGroupPage({ session }: JoinGroupPageProps) {
           </p>
 
           {!joined ? (
-            <button
-              className="btn btn-primary btn-block"
-              onClick={() => void handleJoin()}
-              disabled={!groupId}
-            >
-              {t('join.btn')}
-            </button>
+            <>
+              {isClosed && (
+                <p style={{ color: 'var(--ink-2)', fontSize: 13, marginBottom: 14 }}>
+                  {t('join.closed')}
+                </p>
+              )}
+              <button
+                className="btn btn-primary btn-block"
+                onClick={() => void handleJoin()}
+                disabled={!groupId || isClosed}
+              >
+                {isClosed ? t('join.closedBtn') : t('join.btn')}
+              </button>
+            </>
           ) : (
             <>
               <div style={{
