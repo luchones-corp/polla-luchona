@@ -858,6 +858,27 @@ button, input { font-family: inherit; }
   font-family: var(--font-disp); font-size: 28px; text-transform: uppercase;
   letter-spacing: .03em;
 }
+.profile-name-row {
+  display: flex; align-items: center; gap: 8px; justify-content: center;
+}
+.profile-name-edit-btn {
+  display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-3);
+  cursor: pointer; transition: color .15s, border-color .15s, background .15s;
+}
+.profile-name-edit-btn:hover { color: var(--lime); border-color: var(--lime); background: rgba(198,255,50,.08); }
+.profile-name-edit {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: min(320px, 100%);
+}
+.profile-name-input {
+  width: 100%; padding: 10px 14px; border-radius: var(--r);
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  font-family: var(--font-disp); font-size: 22px; text-align: center;
+  letter-spacing: .02em; text-transform: uppercase;
+}
+.profile-name-input:focus { outline: none; border-color: var(--lime); }
+.profile-name-actions { display: flex; gap: 8px; }
 .profile-stats-grid {
   display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
   margin-bottom: 24px;

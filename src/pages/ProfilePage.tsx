@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
-import { getFixtures, getPublicUserPredictions, getUserPredictions, getUserProfile } from '../lib/api'
+import { getFixtures, getPublicUserPredictions, getUserPredictions, getUserProfile, saveDisplayName } from '../lib/api'
 import { computeStreak } from '../lib/streaks'
 import { useLocale } from '../contexts/LocaleContext'
 import { Avatar } from '../components/Avatar'
@@ -10,14 +10,14 @@ import type { Fixture, MatchPick, Prediction } from '../lib/types'
 
 type ProfilePageProps = {
   session: Session
-  groupId: string | null
 }
 
-export function ProfilePage({ session, groupId }: ProfilePageProps) {
+export function ProfilePage({ session }: ProfilePageProps) {
   const { userId } = useParams<{ userId: string }>()
   const navigate = useNavigate()
   const { t } = useLocale()
   const isOwn = userId === session.user.id
+  const groupId = typeof window !== 'undefined' ? localStorage.getItem('selectedGroupId') : null
 
   const pickLabel: Record<MatchPick, string> = { HOME: t('pick.home'), DRAW: 'X', AWAY: t('pick.away') }
 
@@ -26,6 +26,10 @@ export function ProfilePage({ session, groupId }: ProfilePageProps) {
   const [predictions, setPredictions] = useState<Prediction[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [nameError, setNameError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!userId) return
@@ -140,6 +144,40 @@ export function ProfilePage({ session, groupId }: ProfilePageProps) {
 
   const displayName = profile.display_name ?? t('profile.noName')
 
+  function startEditName() {
+    setNameDraft(profile?.display_name ?? '')
+    setNameError(null)
+    setEditingName(true)
+  }
+
+  function cancelEditName() {
+    setEditingName(false)
+    setNameError(null)
+  }
+
+  async function submitNameEdit() {
+    const trimmed = nameDraft.trim()
+    if (!trimmed) {
+      setNameError(t('displayName.required'))
+      return
+    }
+    if (trimmed === profile?.display_name) {
+      setEditingName(false)
+      return
+    }
+    setSavingName(true)
+    setNameError(null)
+    try {
+      await saveDisplayName(session.user.id, trimmed)
+      setProfile(p => p ? { ...p, display_name: trimmed } : p)
+      setEditingName(false)
+    } catch (e) {
+      setNameError(e instanceof Error ? e.message : t('displayName.error'))
+    } finally {
+      setSavingName(false)
+    }
+  }
+
   return (
     <div className="shell">
       <header className="topbar">
@@ -157,8 +195,50 @@ export function ProfilePage({ session, groupId }: ProfilePageProps) {
         <div className="wrap fade-in">
           <div className="profile-header">
             <Avatar name={displayName} size={72} />
-            <h1 className="profile-name">{displayName}</h1>
-            {isOwn && <span className="chip chip-lime" style={{ marginTop: 4 }}>{t('profile.you')}</span>}
+            {isOwn && editingName ? (
+              <form
+                className="profile-name-edit"
+                onSubmit={(e) => { e.preventDefault(); void submitNameEdit() }}
+              >
+                <input
+                  className="profile-name-input"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  placeholder={t('displayName.placeholder')}
+                  autoFocus
+                  disabled={savingName}
+                  maxLength={40}
+                />
+                <div className="profile-name-actions">
+                  <button type="submit" className="btn btn-primary btn-sm" disabled={savingName}>
+                    {savingName ? t('displayName.saving') : t('profile.saveName')}
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={cancelEditName} disabled={savingName}>
+                    {t('profile.cancel')}
+                  </button>
+                </div>
+                {nameError && <p className="error-msg" style={{ marginTop: 4 }}>{nameError}</p>}
+              </form>
+            ) : (
+              <div className="profile-name-row">
+                <h1 className="profile-name">{displayName}</h1>
+                {isOwn && (
+                  <button
+                    type="button"
+                    className="profile-name-edit-btn"
+                    onClick={startEditName}
+                    title={t('profile.editName')}
+                    aria-label={t('profile.editName')}
+                  >
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2">
+                      <path d="M12 20h9" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5z" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+            {isOwn && !editingName && <span className="chip chip-lime" style={{ marginTop: 4 }}>{t('profile.you')}</span>}
             {streak.isHot && <span className="streak-badge">🔥 {streak.current}</span>}
           </div>
 

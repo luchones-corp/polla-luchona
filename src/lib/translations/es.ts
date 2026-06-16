@@ -264,6 +264,9 @@ export const es: Record<string, string> = {
   'profile.predictedCol': 'Predichos',
   'profile.correctCol': 'Aciertos',
   'profile.recentResults': 'Ultimos resultados',
+  'profile.editName': 'Editar nombre',
+  'profile.saveName': 'Guardar',
+  'profile.cancel': 'Cancelar',
 
   // Archive
   'archive.loading': 'Cargando archivo...',

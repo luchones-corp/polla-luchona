@@ -118,7 +118,7 @@ export function App() {
           path="/profile/:userId"
           element={
             session ? (
-              <ProfilePage session={session} groupId={null} />
+              <ProfilePage session={session} />
             ) : (
               <Navigate to="/" replace />
             )

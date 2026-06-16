@@ -264,6 +264,9 @@ export const en: Record<string, string> = {
   'profile.predictedCol': 'Predicted',
   'profile.correctCol': 'Correct',
   'profile.recentResults': 'Recent results',
+  'profile.editName': 'Edit name',
+  'profile.saveName': 'Save',
+  'profile.cancel': 'Cancel',
 
   // Archive
   'archive.loading': 'Loading archive...',
