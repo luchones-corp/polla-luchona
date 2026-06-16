@@ -8,6 +8,7 @@ import type { Fixture, GroupPrediction, MatchPick, Prediction, ReactionSummary }
 type StageFilter = 'todos' | 'group' | 'r32' | 'r16' | 'qf' | 'sf' | 'final'
 type DateFilter = 'todos' | 'hoy' | 'mañana'
 type StatusFilter = 'todos' | 'pendiente' | 'predicho'
+type MatchStatusFilter = 'proximos' | 'finalizados' | 'todos'
 
 export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByMatch, onPick, onScoreChange, groupId, userId, reactionsByMatch, lockMinutesBefore = 0 }: {
   fixtures: Fixture[]
@@ -27,6 +28,7 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
   const [dateFilter, setDateFilter] = useState<DateFilter>('todos')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('todos')
   const [groupFilter, setGroupFilter] = useState<string>('todos')
+  const [matchStatusFilter, setMatchStatusFilter] = useState<MatchStatusFilter>('proximos')
 
   const stageOptions: { value: StageFilter; label: string }[] = [
     { value: 'todos', label: t('partidos.allStages') },
@@ -41,6 +43,11 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
     { value: 'todos', label: t('partidos.anyTime') },
     { value: 'hoy', label: t('partidos.today') },
     { value: 'mañana', label: t('partidos.tomorrow') },
+  ]
+  const matchStatusOptions: { value: MatchStatusFilter; label: string }[] = [
+    { value: 'proximos', label: t('partidos.upcoming') },
+    { value: 'finalizados', label: t('partidos.finished') },
+    { value: 'todos', label: t('partidos.allMatches') },
   ]
 
   const availableGroups = useMemo(() => {
@@ -58,6 +65,8 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
 
   const filtered = useMemo(() => {
     return fixtures.filter(f => {
+      if (matchStatusFilter === 'proximos' && f.status === 'finished') return false
+      if (matchStatusFilter === 'finalizados' && f.status !== 'finished') return false
       if (stageFilter !== 'todos' && f.stage !== stageFilter) return false
       if (showGroupDropdown && groupFilter !== 'todos') {
         if (f.stage !== 'group' || f.group_label !== groupFilter) return false
@@ -68,7 +77,7 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
       if (statusFilter === 'predicho' && !predictionsByMatch[f.id]) return false
       return true
     })
-  }, [fixtures, predictionsByMatch, stageFilter, dateFilter, statusFilter, groupFilter, showGroupDropdown])
+  }, [fixtures, predictionsByMatch, stageFilter, dateFilter, statusFilter, groupFilter, showGroupDropdown, matchStatusFilter])
 
   const PER_PAGE = 10
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE))
@@ -95,13 +104,14 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
     return result
   }, [paged, t])
 
-  const hasActiveFilters = stageFilter !== 'todos' || dateFilter !== 'todos' || statusFilter !== 'todos' || groupFilter !== 'todos'
+  const hasActiveFilters = stageFilter !== 'todos' || dateFilter !== 'todos' || statusFilter !== 'todos' || groupFilter !== 'todos' || matchStatusFilter !== 'proximos'
 
   function clearFilters() {
     setStageFilter('todos')
     setDateFilter('todos')
     setStatusFilter('todos')
     setGroupFilter('todos')
+    setMatchStatusFilter('proximos')
     setPage(0)
   }
 
@@ -150,6 +160,16 @@ export function PartidosView({ fixtures, predictionsByMatch, groupPredictionsByM
 
       {/* --- Dropdowns row --- */}
       <div className="partidos-dropdowns">
+        <label className="filter-dropdown">
+          <span className="filter-dropdown-label">{t('partidos.matchStatusLabel')}</span>
+          <select
+            value={matchStatusFilter}
+            onChange={e => setFilterAndReset(setMatchStatusFilter, e.target.value as MatchStatusFilter)}
+          >
+            {matchStatusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+
         <label className="filter-dropdown">
           <span className="filter-dropdown-label">{t('partidos.stageLabel')}</span>
           <select
