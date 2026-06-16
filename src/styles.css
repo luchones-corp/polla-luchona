@@ -948,6 +948,14 @@ button, input { font-family: inherit; }
   .auth-art { display: none; }
   .nav-desk { display: none; }
   .me-chip .me-name { display: none; }
+  .topbar-in { gap: 8px; padding: 0 14px; }
+  .wrap { padding: 0 14px; }
+  .topbar-right { gap: 6px; }
+  .topbar-right .btn-sm { padding: 7px 9px; }
+  .me-chip { padding: 3px 3px 3px 6px; }
+  .brand { gap: 8px; min-width: 0; }
+  .brand-txt { min-width: 0; }
+  .brand-txt b { font-size: 16px; }
   .nav-mob {
     display: grid; grid-template-columns: repeat(4,1fr); position: fixed; bottom: 0; left: 0; right: 0;
     z-index: 50; background: rgba(9,12,15,.92); backdrop-filter: blur(16px); border-top: 1px solid var(--line-2);
