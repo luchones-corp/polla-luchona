@@ -317,7 +317,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
                   const isExact = pred.score_home !== null && pred.score_away !== null
                     && pred.score_home === f.ft_home && pred.score_away === f.ft_away
                   const isCorrect = pred.pick === f.outcome
-                  const pts = isExact ? 3 : isCorrect ? 1 : 0
+                  const pts = isExact ? 2 : isCorrect ? 1 : 0
 
                   return (
                     <div key={f.id} className={'profile-history-row' + (isExact ? ' exact' : isCorrect ? ' correct' : '')}>

@@ -27,7 +27,7 @@ function getPointsEarned(fixture: Fixture, prediction: Prediction | undefined): 
   if (!prediction || fixture.status !== 'finished' || fixture.outcome === null) return { pts: 0, isExact: false }
   const isExact = prediction.score_home !== null && prediction.score_away !== null
     && prediction.score_home === fixture.ft_home && prediction.score_away === fixture.ft_away
-  if (isExact) return { pts: 3, isExact: true }
+  if (isExact) return { pts: 2, isExact: true }
   if (prediction.pick === fixture.outcome) return { pts: 1, isExact: false }
   return { pts: 0, isExact: false }
 }
