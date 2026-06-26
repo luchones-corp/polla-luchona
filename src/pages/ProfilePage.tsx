@@ -87,7 +87,7 @@ export function ProfilePage({ session }: ProfilePageProps) {
       pickCounts[pred.pick]++
       const isExact = pred.score_home !== null && pred.score_away !== null
         && pred.score_home === f.ft_home && pred.score_away === f.ft_away
-      if (isExact) { totalPoints += 3; correct++; exactCount++ }
+      if (isExact) { totalPoints += 2; correct++; exactCount++ }
       else if (pred.pick === f.outcome) { totalPoints += 1; correct++ }
     }
 

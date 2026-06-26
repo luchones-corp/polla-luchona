@@ -74,7 +74,7 @@ export const en: Record<string, string> = {
 
   // Fixture card
   'fx.groupStage': 'Group stage',
-  'fx.exactPts': '+3 pts ★',
+  'fx.exactPts': '+2 pts ★',
   'fx.correctPt': '+1 pt',
   'fx.wrongPts': '+0 pts',
   'fx.yourScore': 'Your score:',

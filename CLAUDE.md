@@ -53,7 +53,7 @@ State management is React hooks only (no Redux). Persistence via localStorage fo
 
 ### Scoring Rules
 
-- **3 pts** for exact score match (both home and away scores correct)
+- **2 pts** for exact score match (both home and away scores correct)
 - **1 pt** for correct outcome only (HOME/DRAW/AWAY)
 - **0 pts** for wrong prediction
 - **Tiebreaker**: points DESC -> exact_count DESC -> last_correct_at DESC -> name ASC
